@@ -20,6 +20,12 @@
         - [条件运算符](#1-3-7)
         - [位运算符](#1-3-8)
         - [sizeof运算符](#1-3-9)
+        - [逗号运算符](#1-3-10)
+        - [类型转换](#1-3-11)
+    - [语句](#1-4)
+        - [try语句块和异常处理](#1-4-6)
+    - [函数](#1-5)
+
 
 
 <h1 id='1'>C++基础</h1>
@@ -719,3 +725,171 @@ char类型运算对象首先提升为int ，往高位添 0 ，然后在逐位取
 移位运算符优先级 比算术运算符低， 比关系运算符 赋值运算符 和条件运算符 高 反正一次多个运算符 建议使用括号
 
 <h3 id='1-3-9'> sizeof运算符 </h3>
+
+what: 返回一条表达式或一个类型名字所占的字节数
+
+how ： 1. 满足右结合律 2. 得到的是size_t类型(无符号)
+```
+int data,*p;
+sizeof data; // data 的类型的大小 即 sizeof (int);
+sizeof (int); // 存储int类型的对象所占的空间大小
+sizeof p; // 指针所占空间大小
+sizeof *p;// p所指类型的空间大小，即 sizeof (int); 因为是满足右结合律 相当于 sizeof (*p) 
+//  sizeof不会实际求运算对象的值    所以 p为未初始化指针也没关系
+
+对引用类型执行sizeof运算得到指针本身所占空间的大小
+对数组 ： 对数组中所有的元素各执行一次sizeof运算并将所得结果求和，sizeof不会把数组当成指针
+int a[10];
+sizeof( *a ) 返回a的元素数量
+sizeof(a)/sizeof(*a) // 得到 10
+对 string或vector 只会返回该类型固定部分的大小，不计算长度
+
+sizeof不会实际求运算对象的值，sizeof 返回是一个常量表达式 
+```
+sizeof 优先级高于算术运算符 ，低于点运算符和箭头访问运算符 
+
+<h3 id= '1-3-10'> 逗号运算符</h3>
+
+waht: 有两个运算对象，按从左到右顺序
+
+how： 先对左侧表达式求值，然后将求值结果丢弃。运算符真正结果是右侧表达式的值，如果右侧表达式为左值，那么最终结果也为左值
+
+优先级最低
+
+<h3 id='1-3-11'>类型转换</h3>
+
+隐式转换
+
+#### 算术转换
+
+what: `运算符的运算对象将转换成最宽的类型`
+
+整数提升: 小整数提升为大整数
+
+如果一个运算对象时无符号类型，另一个带符号 
+
+1. 其中无符号类型不小于带符号类型,那么带符号会转换为无符号
+```
+比如
+int a=-3 ;
+unsigned int b=2;
+cout<<a+b<<endl; //输出为 4294967295,a+b 过程中 a 转变为unsigned int类型
+```
+2. 如果无符号所有值都能存在于该带符号类型中 ，转换为带符号,所以可能取决于运行该机器的机器每个类型所占内存大小
+```
+long long  a=-3 ;
+unsigned int b=2;
+cout<<a+b<<endl; // 输出为-1
+```
+
+#### 其他隐式类型的转换
+
+1. 数组转换为指针 : 数组自动转换为数组首元素指针
+
+被用作decltype关键字参数  取地址符(&)  sizeof 和 typeid 等运算符的运算对象时，转换不会发生
+
+2. 指针转换 : 常量整数值0或者字面值nullptr 转换成任意指针类型 ； 指向任意非常量指针能转换为 void *;
+指向任意对象的指针能转换为 const void *;
+
+3. 转换成bool类型 : 如果指针或算数类型值为0，转换结果为false
+
+4. 转换成常量
+```c++
+  int i;
+  const int &j = i;// 非常量转换成const int 的引用
+   int &r = j; // 错误，不允许const转换成非常量 j是常量 如果赋值成功 就能修改j值了
+   //如果 const int &r = j 可以赋值成功
+
+  const int *p = &i; // 非常量的地址转换成const 的地址
+  int *q = p; //错误 
+```
+
+5. 类类型定义的转换
+
+例如 :  while( cin>>s ) while 把 cin转换成布尔值
+
+如果同时提出多个转换请求，这些请求将被拒绝
+
+#### 显式转换
+
+强制转换:  cast-name < type > (expression);
+
+cast-name 种类 1. static_cast  2. dynamic_cast 3. const_cast 4. reinterpret_cast  
+
+<h2 id='1-4'>语句</h2>
+
+<h3 id='1-4-6'> try语句块和异常处理</h3>
+
+异常处理： 1. throw表达式(引发(raise)异常) 2 2. try语句块  (try语句中抛出异常会被某个catch子句处理，异常处理代码) 3. 异常类 (用于在throw表达式和相关catch子句间传递异常具体信息)
+
+#### throw表达式
+
+throw表达式包含关键字 throw 和紧跟着的一个表达式
+```c++
+int a=1,b=2;
+if(a==b)
+    printf("a=b");
+else
+    throw runtime_error("a!=b");
+```
+
+#### try语句
+
+try语句块后面有一个或多个catch子句，catch子句块也无法访问 try 语句块声明的变量
+```c++
+int a,b;
+while(cin>>a>>b)
+{
+ try {
+   if(a==b)
+     cout<< "a=b" <<endl;
+   else  throw runtime_error("a!=b"); // 寻找最近的runtime_error函数 处理异常
+ } catch(runtime_error err){
+    cout<< err.what() // what的信息为 "a!=b"
+        << "\n Try Again? Enter y or n" << endl;
+    char c;
+    cin >> c;
+    if(!cin||c=='n')
+        break; //跳出while循环
+ }
+}
+
+在多层 try 中 如果一层没找到相应处理函数 会返回上层寻找  ，一直没找到 会调用 terminate 库函数，将导致异常程序退出
+```
+
+#### 标准异常
+
+头文件 : exception (最通用异常类exception,只负责报告异常的发生，不提供信息)    stdexcept (常用类)  
+new (bad_alloc)  type_info (bad_cast)
+
+exception 最常见问题
+
+`runtime_error` 只有在运行时能检测出的问题
+
+range_error 运行时出错 : 生成的结果超出了有意义的值域范围
+
+overflow_error 运行时出错 : 计算上溢
+
+underflow_error 运行时出错 : 计算下溢
+
+`logic_error 程序逻辑错误`
+
+domain_error 逻辑错误 : 参数对应的结果值不存在
+
+invalid_argument 逻辑错误 ： 无效参数
+
+length_error  逻辑错误 ：试图创建一个超过该类型最长长度的对象
+
+out_of_range 逻辑错误： 使用一个超出有效范围的值
+
+只能默认初始化 exception bad_alloc bad_cast  其他异常类型都不能默认初始化，需提供错误信息 例如字符串
+
+异常类型定义what成员函数  ，返回值是一个指向C风格字符串 的 const char *
+
+<h2 id='1-5'> 函数</h2>
+
+
+
+
+
+
