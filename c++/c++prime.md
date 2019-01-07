@@ -28,6 +28,11 @@
         - [函数基础](#1-5-1)
         - [参数传递](#1-5-2)
         - [返回类型和return语句](#1-5-3)
+        - [函数重载](#1-5-4)
+        - [特殊用途语言特性](#1-5-5)
+        - [函数匹配](#1-5-6)
+        - [函数指针](#1-5-7)
+    - [类](#1-6)
 
 
 <h1 id='1'>C++基础</h1>
@@ -1042,4 +1047,345 @@ int main()
 	cout<<a<<endl;
 }
 ```
+列表初始化返回值
+```c++
+vector<string> aa(int a,int b)
+{
+    if(a==0&&b==0)
+    return {};
+    if(a==b)
+        return {"a=b","OK"};
+    else
+        return {"a!=b","a","b"};
+}
+
+int main()
+{
+	int a,b;
+	vector<string> v;
+	while(~scanf("%d%d",&a,&b))
+    {
+        v=aa(a,b);
+        for(auto s:v)
+            cout<<s<<endl;
+    }
+}
+```
+主函数main 返回值:默认是在最后 返回return 0 (表示成功),如果想显式返回   返回失败  return EXIT_FAILURE     ，返回成功  return EXIT_SUCCESS    其中EXIT_FAILURE和EXIT_SUCCESS 都是预处理变量
+
+#### 返回数组指针
+
+1. 使用别名  ： 
+```c++
+using arrt = int[10];
+arrt* func(int i); // func返回一个指向含有10个整数的数组的指针
+```
+2. 记住维度
+```c++
+int ( *func( int i ) )[10] // func返回一个指向含有10个整数的数组的指针
+
+func(int i) 表示func函数需要一个int类型实参
+( *func( int i ) ) 表示 返回的是指针
+( *func( int i ) )[10] 表示指针指向大小为 10的数组
+int ( *func( int i ) )[10] 表示 数组类型为int
+```
+3. 使用尾置返回类型
+```c++
+auto func(int i) - > int (*)[10] // func 接受一个int类型实参 返回一个指针，该指针指向含有10个整数的数组
+```
+4. 使用declty
+```c++
+int odd[]={0,1,2,3,4,5,6,7,8,9};
+decltype(odd) *func(i) // 返回一个指针，该指针指向含有10个整数的数组
+{
+
+}
+```
+
+<h3 id='1-5-4'>函数重载</h3>
+
+重载函数： 同一作用域下几个函数名字相同但是 **形参列表**(形参数量或类型) 不同，(main函数不能重载)
+
+错误重载
+```c++
+1. 仅仅改变返回值
+Record lookup(const Account&)
+bool lookup(const Account&) //错误，只有返回值不同
+2. 类型相同
+Record lookup(const Account &acct)
+Record lookup(const Account&) //错误，只是忽略了形参
+
+Record lookup(const  Phone&) 
+Record lookup(const  Telno&) //错误，类型和数量相同
+
+3. 顶层const 形参 和 没有顶层const的形参 无法区分开来
+Record lookup( Phone ) 
+Record lookup( const Phone ) //错误 ，是顶层const
+
+Record lookup( Phone*) 
+Record lookup( Phone* const ) //错误 ，是顶层const
+```
+
+正确重载
+```c++
+Record lookup( Phone& ) 
+Record lookup( const Phone& ) // 正确，作用于常量引用，是底层const
+
+Record lookup( Phone* ) 
+Record lookup( const Phone* ) //正确 ，作用于指向常量的指针，是底层const
+
+PS. const对象只能传递给const 形参 ， const形参能接收非const对象 ，但是如果传递的是非const对象，那么优先选用非const函数版本
+```
+
+区别底层和顶层const
+```c++
+int const *a; //底层const
+int *const b; //顶层const
+```
+
+const_cost 和 重载 : 使用const 函数 创建 非const版本函数
+```c++
+// 比较两个string 的长度 返回较短的那个
+const string &shorterString(const string &s1,const string &s2)
+{
+    cout<<"const string&"<<endl;
+    return s1.size()<= s2.size() ? s1 : s2;
+}
+string &shorterString(string &s1, string &s2)
+{
+    auto &r = shorterString(const_cast<const string&>(s1),
+                            const_cast<const string&>(s2));
+    cout<<"string&"<<endl;
+    return const_cast<string&>(r);
+}
+int main()
+{
+    string s1 ="11",s2="1";
+    const string s3 ="11",s4="1";
+    shorterString(s1,s2);
+    cout<<endl;
+    shorterString(s3,s4);
+}
+
+结果
+const string&
+string&
+
+const string&
+```
+
+<h3 id='1-5-5'>特殊用途语言特性</h3>
+
+默认实参 内联函数  constexpr函数
+
+#### 默认实参
+一个形参添加默认值后 ，默认值后的形参也得有默认值
+```c++
+int aa(const int longg=1,const int wight=2 ,const int hign=3)
+{
+    return longg*wight*hign;
+}
+int main()
+{
+    cout<< aa() <<endl;  //6
+    cout<<aa(2,3,4) <<endl; // 24
+    cout<< aa(2,3) <<endl; // 18 
+}
+```
+我们不能修改一个已经存在的默认值
+```c++
+int aa(const int longg,const int wight ,const int hign=3)；
+
+int aa(const int longg,const int wight ,const int hign=4)；//错误
+
+int aa(const int longg=1,const int wight=2 ,const int hign) //正确
+```
+局部变量不能作为默认参数
+
+#### 内联函数和constexpr函数
+
+what内联函数： 将内联函数在每个调用点上"内联地"展开
+
+why内联函数： 调用函数一般比求等价表达式慢一些  函数( 1. 调用前要先保存寄存器，在返回时恢复 2. 可能要拷贝实参 3. 程序转向一个新的位置继续执行)
+```c++
+inline int
+aa(const int longg=1,const int wight=2 ,const int hign=3)
+{
+  return longg*wight*hign;
+}
+int main()
+{
+    cout<< aa() <<endl; //6
+    cout<<aa(2,3) <<endl; // 24
+}
+
+编译过程中展开类似于 cout<< longg*wight*hign <<endl， 消除函数运行时开销
+```
+内联函数用于优化规模较小，流程直接 频繁调用的函数
+
+`constexpr函数`  what : 能用于常量表达式的函数(1. 函数的返回类型和返回值都得是字面值类型 2. 函数体中必须有且只有一条return语句 )
+```c++
+constexpr int new_sz() {return 4;}
+constexpr size_t scale(size_t cnt) { return new_sz() * cnt;} // 相乘
+int main()
+{
+  cout<<scale(2)<<endl;
+  int a[scale(2)] ; // scale(2) 是常量表达式
+  int v = 2;
+  int aa[scale(v)] ;  // 错误 scale(a) 不是常量表达式
+}
+
+所以 用非常量表达式调用constexpr函数 得到非常量表达式
+```
+
+#### 调试帮助
+
+assert 预处理宏 ： assert (expr); expr是表达式 ，如果expr为真 ，什么也不做，否则输出信息并结束程序执行
+
+assert(word.size()) > threshole) ; // 要求给定单词都大于某个阈值
+
+NDEBUG: 定义了NDEBUG ，assert就不运作，例如可以在开头定义 #define NDEBUG
+```c++
+int aa(const int &a,const int &b)
+{
+    #ifndef NDEBUG
+        cerr << __func__<<endl; // __func__是编译器定义的局部静态变量 用于存放函数名字
+    #endif
+    assert(a > b);
+    return a;
+}
+int main()
+{
+   cout<<aa(1,3)<<endl; 
+   //输出
+   aa
+   Assertion failed: a > b, file C:\Users\??????\Desktop\c++\main.cpp, line 8
+}
+```
+```c++
+#define NDEBUG#include <assert.h> // 在assert.h添加了 NDEBUG 使 assert无效
+#include<bits/stdc++.h>
+using namespace std;
+int aa(const int &a,const int &b)
+{
+    #ifndef NDEBUG
+        cerr << __func__<<endl;
+    #endif
+    assert(a > b);
+    return a;
+}
+int main()
+{
+   cout<<aa(1,3)<<endl; 
+   //输出 1 
+}
+
+```
+```
+ 4 int aa(const int &a,const int &b)
+ 5 {
+ 6    cerr << __FILE__<<endl;
+ 7 }
+```
+预处理器定义的对程序调试有帮助的名字 1.  __func__(存放函数名字)< aa > 2. __FILE__(存放文件名的字符串字面值) < C:\Users\姚杨伟\Desktop\c++\main.cpp >  3. __LINE__(存放当前行号的整形字面值)< 6 >  4. __TIME__ (存放文件编译时间的字符串字面值)< 14:58:07 > 5. __DATE__ (存放文件编译日期的字符串字面值)<Jan  7 2019>
+
+<h3 id='1-5-6'>函数匹配</h3>
+
+调用函数
+```c++
+void f();
+void f(int);
+void f(int ,int);
+void f(double ,double=3.14);
+
+f(5,6);
+```
+1. 确认候选函数
+
+候选函数: how (1. 与被调用函数同名 2. 其声明在调用点可见) ,例子中 有 4个
+
+2. 确认可行函数
+
+可行函数: how(1. 其形参数量与本次调用提供的实参数相等{ 也可形参比较多 但是 形参减去有默认值的形参<=实参数}  2. 每个实参类型与对应的形参类型相同，或者能转换成形参类型 ) ，例子由 2个  void f(int); 和 void f(double ,double=3.14);
+
+3. 寻找最佳匹配
+
+实参和形参类型最接近，匹配的越好，找到 void f(double ,double=3.14);
+
+```c++
+void f(const int ,const int ){}
+void f (const double ,const double ){}
+int main()
+{
+    f(1,2.2); // 错误 存在二义性 ，1 更符合 int ，2.2 更符合 double
+}
+```
+```c++
+void f(){cout<<1<<endl;}
+void f(const int){cout<<2<<endl;}
+void f(const int ,const int ){cout<<3<<endl;}
+void f (const double ,const double ){cout<<4<<endl;}
+int main()
+{
+    f();
+    f(1);
+    f(1,1);
+    f(1.1,1.1);
+}
+
+1 2 3 4
+```
+#### 实参类型转换
+
+转换排序 1. 精准匹配 2. const转换 3. 类型提升 4. 匹配类型转换或指针转换 5. 类类型转换
+
+所有算术类型转换级别都一样  char如果没有精准匹配会优先转换int而不是 short
+
+能用非常量函数 会先匹配 非常量的函数
+
+<h3 id ='1-5-7'>函数指针</h3>
+
+函数指针: 函数的类型由它的返回类型和形参类型共同决定
+```c++
+void aa(const int a){cout<< a <<endl;} 
+void (*p)(const int); //函数指针
+int main()
+{
+
+   auto pf = &aa;  // 函数指针 pf
+   p = aa;  //让 p 指向 aa
+   p(0);  // 能输出 0
+   (*p)(0); // 能输出 0
+   p =0 // 让 p 不指向任何一个函数
+}
+```
+
+如果定义了指向重载函数的指针 ，那么指针类型必须与重载函数的某一个精确匹配
+
+与数组类似，如果实参为函数类型 会自动转换为该函数类型的指针，如果形参是函数类型，会自动转换为函数指针类型
+
+返回指向函数的指针, 返回类型不会自动把函数类型转换为指针类型,我们必须显式转换
+```c++
+using F = int(int *,int); // F 是函数类型
+using PF = int(*)(int *,int);// F 是指针类型
+int main()
+{
+    PE f1(int); // 正确 ,f1返回指向函数的指针
+    F * f1(int); //正确 ,f1返回指向函数的指针，显式指定
+}
+```
+decltype作用于某个函数时，返回函数类型而不是指针类型所以我们要显式指定，
+
+<h2 id='1-6'>类</h2>
+
+
+
+
+
+
+
+
+
+
+
 
