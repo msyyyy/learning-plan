@@ -33,7 +33,7 @@
         - [函数匹配](#1-5-6)
         - [函数指针](#1-5-7)
     - [类](#1-6)
-
+        - [定义抽象数据类型](#1-6-1)
 
 <h1 id='1'>C++基础</h1>
 
@@ -1378,11 +1378,188 @@ decltype作用于某个函数时，返回函数类型而不是指针类型所以
 
 <h2 id='1-6'>类</h2>
 
+####定义改进的类
+
+类的基本思想是数据抽象和封装。
+
+封装实现了类的接口和实现分离 。类的接口包含用户能实现操作 ，类的实现包括类的数据成员，负责接口实现的函数体以及定义类所需的各种私有函数
+
+<h3 id='1-6-1'>定义抽象数据类型</h3>
+
+成员函数的声明必须在类的内部，他的定义则可以在类的内部也可以在类的外部，作为接口组成部分的非成员函数，他们的定义和声明在类的外部
+
+定义在类内部的函数是隐式的inline 函数
+```c++
+struct  node
+{
+   string isbn() const {return aa;} // 成员函数通过 this 的额外的隐式参数来访问调用他的那个对象,实际为 node::isbn( &a )
+    string aa="1"; // 之所以aa定义在后面上面的函数还能使用是因为，编译器首先编译成员的声明，然后才轮到成员函数体
+};
+int main()
+{
+  node a;
+  cout<<a.isbn(); // 输出 1 
+}
+```
+```c++
+struct  node
+{
+    string isbn() {return aa;} //这边应该修改为string isbn() const {return aa;} 才能正确访问 
+    string aa="1";
+};
+int main()
+{
+  const node a;
+  cout<<a.isbn(); //报错 ，因为this的类型是指向类 类型非常量版本的常量指针，所以 这边a为 const node 类型 不能通过非常量类型访问
+}
+```
+```c++
+在内部声明 外部定义
+struct  node
+{
+      int uu()const;
+      int u=6;
+};
+int node::uu() const {return u;}
+int main()
+{
+  const node a;
+  cout<<a.uu(); //输出 6 
+}
+```
+
+return *this  返回调用该函数的对象
+
+#### 定义类相关的非成员函数
+
+如果非成员函数是类接口的组成部分，在这些函数的声明一个和类声明在同一个头文件内
+
+IO类属于不能拷贝的类型，只能通过普通引用来传递
+```c++
+struct  node
+{
+      int u;
+};
+istream &readd(istream &is,node &item) // readd会改变对象内容
+{
+    is >> item.u;
+    return is;
+}
+ostream &out(ostream &os,const node &item) // out不会改变所以能设置为const
+{
+    os << item.u;
+    return os;
+}
+int main()
+{
+  node a;
+  readd(cin,a); // 键入
+  out(cout,a); // 输出
+}
+```
+
+#### 构造函数
+
+what：初始化对象的数据成员，构造函数不能被声明为const，因为直到构造函数完成初始化工作，对象才能真正取得常量属性(构造函数在const 对象构造过程中可以向里面写值)
+
+合成的默认构造函数：没有显示的定义构造函数，编译器就会隐式的定义一个构造函数 (1. 如果存在类内初始值，用它来初始化 成员 2. 否则，默认初始化该成员) 
+
+合成的默认构造函数  缺点 ：1. 只有在不包含任何构造函数下才会生成  2. 可能会执行错误操作，定义在块内的内置类型或复合类型(比如 数组和指针)的对象默认初始化，他的值时未定义的  3. 类中包含其他类成员且该成员未初始化，编译器不能初始化该成员
 
 
+`= default (需要默认的行为 ，生成默认的构造函数)`
+```c++
+struct  node
+{
+
+    int u;
+    node () = default; // 这个函数作用完全等价于合成的默认构造函数，因为我们需要其他形式的构造函数也想保留合成的默认构造函数
+};
+int main()
+{
+  node a;
+  cout<<a.u<<endl;
+}
+```
+
+不过有些编译器不支持类内初始化 ，`需要用 构造函数初始化列表`
+```c++
+struct  node
+{
+    node () = default; // 默认构造函数
+    node (const int &a):a(a) {} // 构造函数初始化列表
+    node (const int &a,const int &b): a(a) ,b(b) {}
+    int a;
+    int b;
+};
+int main()
+{
+  node a(1);
+  cout<<a.a<<" "<<a.b<<endl; // 支持类内初始值 输出 1  0        不支持 输出 1   7012224(未定义的值)
+  node b(2,3);
+  cout<<b.a<<" "<<b.b<<endl; // 输出 2 3
+}
 
 
+如果编译器支持类内初始值 ，那么 node (const int &a):a(a) {}  相当于  node (const int &a):a(a)  b(0) {} 
+如果不支持，需要显式的初始化每个内置类型的成员
+```
+`在类外部定义构造函数`：编写接口
+```c++
+struct  node
+{
+    node () = default;
+    node (const int &a):a(a) {}
+    node (const int &a,const int &b): a(a) ,b(b) {}
+    node (istream &);
+    int a;
+    int b;
+};
+istream &readd(istream &is,node &item)
+{
+    is >> item.a >> item.b;
+    return is;
+}
+node::node(istream &is)
+{
+    readd(is,*this); // 从is中读取一条信息后存入this中
+}
+int main()
+{
+   node a(cin);
+   cout<<a.a<<" "<<a.b<<endl; //输入 1 2    输出 1 2 
+}
 
+```
+将接口定义到内部
+```c++
+struct  node; // 先声明
+istream &readd(istream &is,node &item); // 先声明
+struct  node
+{
+    node () = default;
+    node (const int &a):a(a) {}
+    node (const int &a,const int &b): a(a) ,b(b) {}
+    node (istream &is)
+    {
+         readd(is,*this);
+    }
+    int a;
+    int b;
+};
+istream &readd(istream &is,node &item)
+{
+    is >> item.a >> item.b;
+    return is;
+}
+int main()
+{
+   node a(cin);
+   cout<<a.a<<" "<<a.b<<endl;
+}
+```
+
+#### 拷贝 ，赋值和析构
 
 
 
