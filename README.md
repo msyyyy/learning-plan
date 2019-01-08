@@ -7,7 +7,7 @@
 
 [面试真题](./面试真题/README.md)
 
-[Linux](./Linux/README.md)
+[操作系统](./操作系统/README.md)
 
 [sql数据库](./sql数据库/README.md)
 
