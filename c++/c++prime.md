@@ -34,6 +34,11 @@
         - [函数指针](#1-5-7)
     - [类](#1-6)
         - [定义抽象数据类型](#1-6-1)
+        - [访问控制和封装](#1-6-2)
+        - [类的其他特性](#1-6-3)
+        - [类的作用域](#1-6-4)
+        - [构造函数再探](#1-6-5)
+        - [类的静态成员](#1-6-6)
 
 <h1 id='1'>C++基础</h1>
 
@@ -1559,7 +1564,459 @@ int main()
 }
 ```
 
-#### 拷贝 ，赋值和析构
+#### 拷贝 ，赋值和析构(销毁)
+
+拷贝：初始化变量以及以值的方式传递或返回一个对象
+
+赋值：让我们使用赋值运算符时
+
+销毁：局部对象在创建他的块结束时销毁，vector(数组)销毁时，里面的内容也会销毁
+
+不主动定义这些类，编译器会主动合成，但是有些特殊类会有问题(比如需要动态内存的类)，对于需要动态内存的类，我们最好使用vector或string
+
+<h3 id='1-6-2'>访问控制和封装</h3>
+
+访问说明符 ： 1. public (定义类的接口(构造函数和部分成员函数) ，在整个程序都能访问)  2. private (封装了类的实现细节(数据成员和实现部分的函数)   能被类的成员函数访问，但不能被使用该类的代码访问 )
+
+```c++
+class aa {
+public:
+    aa():a(0),b(0) {}
+    aa(const double a,const double b):a(a),b(b) {}
+    istream &readd(istream &is,aa &item)
+    {
+        is >> item.a >> item.b;
+       return is;
+    }
+    aa(istream& is)
+    {
+         readd(is,*this);
+    }
+    double bb()const {return a+b; }
+private:
+    double a=0.0;
+    double b=0.0;
+};
+int main()
+{
+  aa  p(cin);
+  cout << p.bb() <<endl;
+   cout<< p.a; //会报错 因为 a.a是类的私有成员
+   //如果将readd函数接口放在外部也就不能访问私有成员
+}
+```
+
+class和struct的区别在于默认的访问权限，claa是 private ，struct 是public
+
+#### 友元
+
+
+友元：what:类允许其他类或者非成员函数访问他的非公有成员，友元只能定义在类的内部(最后定义在开头)
+
+```c++
+class aa;
+istream &readd(istream &is,aa &item);//为友元函数提供单独的声明
+class aa {
+    // 为aa的非成员函数所做的友元声明
+    friend istream &readd(istream &is,aa &item);
+public:
+    aa():a(0),b(0) {}
+    aa(const double a,const double b):a(a),b(b) {}
+    aa(istream& );
+    double bb()const {return a+b; }
+private:
+    double a=0.0;
+    double b=0.0;
+};
+istream &readd(istream &is,aa &item) //readd为友元 定义在外部也能访问类的私有成员
+{
+    is >> item.a >> item.b;
+    return is;
+}
+aa::aa(istream &is)
+{
+    readd(is,*this);
+}
+int main()
+{
+  aa  p(cin);
+  cout << p.bb() <<endl;
+
+}
+```
+
+why封装: 1. 确保用户代码不会无意破坏封装的对象 2. 被封装的类的具体实现细节可以随时改变，而无需调整用户级别的代码(使用该类的源文件需要重新编译) 
+
+友元的声明仅仅指定了访问权限，所以我们姚专门对函数进行声明，为了使友元对类的用户可见，我们最好将友元的声明与类本身放在同一头文件，为友元函数提供单独的声明
+
+<h3 id='1-6-3'>类的其他特性</h3>
+
+`类型成员` ：某种类型在类中的别名.必须先定义后使用所以一般放在类开始的地方
+```c++
+class Screen{ // 显示器的一个窗口
+    public:
+        typedef std::string::size_type pos;
+    private:
+        pos cursor=0; //光标位置
+        pos height = 0,width = 0; // 屏幕宽和高
+        std::string contents;
+};
+```
+`内联函数`： **定义**在类内部的成员函数默认为内联函数，类外部定义可以用inline关键字修饰
+
+可变数据成员 :mutable 即使他是const对象的成员也能改变
+
+```c++
+class Screen{
+public:
+    int vv(){return a;}
+    void aa() const {++a;} //即使是const对象也能改变 可变数据成员
+private:
+    mutable int a=0;
+};
+int main()
+{
+  Screen p;
+  p.aa();
+  cout<<p.vv()<<endl; //结果为1
+}
+```
+
+类内初始值必须使用=的初始化形式或者花括号括起来的直接初始化形式
+
+```c++
+class Screen{
+public:
+    Screen():a(0),b(0) {}
+    Screen(int a,int b): a(a),b(b) {}
+    int aa(){return a;}
+    int bb(){return b;}
+private:
+     int a;
+     int b;
+};
+class Window_mgr {
+public:
+    vector<Screen> Screens{Screen(4,9)};
+};
+int main()
+{
+  Window_mgr p;
+  cout<< p.Screens[0].aa()<<" "<< p.Screens[0].bb()<<endl; // 输出 4 9
+}
+
+```
+
+#### 返回*this的成员函数
+
+```c++
+class Screen{
+public:
+    Screen():a(0),b(0) {}
+    Screen(int a,int b): a(a),b(b) {}
+    int aa(){return a;}
+    int bb(){return b;}
+    Screen &upa(int); // 返回的是引用，是左值，意味着返回的是对象本身而不是副本
+private:
+     int a;
+     int b;
+};
+inline Screen &Screen::upa(int c) // (内联函数 返回左值，意味着可以继续运算)
+{
+    a+=c;   // 将c的值加到Screen对象的a值上
+    return *this;
+}
+int main()
+{
+  Screen p;
+  p.upa(10).upa(9);
+  cout<<p.aa()<<" "<<p.bb()<<endl; // 输出 19 0
+}
+
+
+如果 返回的是副本  
+
+Screen upa(int);
+
+inline Screen Screen::upa(int c) 
+{
+    a+=c;   // 将c的值加到Screen对象的a值上
+    return *this;
+}
+int main()
+{
+  Screen p;
+  p.upa(10).upa(9); // 只有前一个有效 ，upa(10)后返回的是右值，只是副本不影响原值
+  cout<<p.aa()<<" "<<p.bb()<<endl; //返回的是 10 0
+}
+
+```
+
+##### 从const成员函数中返回 *this
+
+一个const对象成员函数如果以引用的形式返回*this ，那么他的返回类型将是个常量引用。
+```c++
+class Screen{
+public:
+    Screen():a(0),b(0) {}
+    Screen(int a,int b): a(a),b(b) {}
+    int aa(){return a;}
+    int bb(){return b;}
+    // 根据对象是否是const重载了display函数
+    const Screen &display() const {return *this;} //返回个常量引用,它引用的也是常量
+    Screen &display() {return *this;}
+
+    Screen &upa(int);
+private:
+     int a;
+     int b;
+};
+inline Screen &Screen::upa(int c)
+{
+    a+=c;
+    return *this;
+}
+int main()
+{
+  Screen p;
+   p.display().upa(9);
+  //p.display().upa(9); 在仅有常量版本时不工作  因为常量引用不能继续进行upa(9)操作
+  cout<<p.aa()<<" "<<p.bb()<<endl;
+}
+```
+
+#### 类类型
+
+即使两个类的成员列表完全一致，他们也是不同类型
+```c++
+class x; // 声明 x类
+class y; // 声明 y 类
+class x {
+y* a =nullptr; // x中包含一个指向y类的指针
+};
+class y {
+ x b;  // y中包含一个x类
+};
+```
+
+#### 友元再探
+
+类可以让类成为自己友元 ，也可以让一个类的某个成员函数成为自己友元
+
+类友元,aa类成员函数都能访问Screen的私有部分，友元关系不具有传递性(a的友元b，b的友元c ，c不是a的友元)
+```c++
+class aa;
+class Screen{
+    friend class aa;
+private:
+     int a;
+};
+class aa{
+public:
+    void f()
+    {
+        Screen p;
+        p.a=1;
+        cout<<p.a<<endl;
+    }
+};
+int main()
+{
+    aa u;
+    u.f();
+}
+```
+成员函数友元，仅仅类的该成员函数能访问类的私有部分
+```c++
+class aa{   
+public:
+    void f();  //1. 先定义aa并声明 f
+};
+class Screen{
+    friend void aa::f();  // 2. 声明并定义 Screen 包括对 f 的友元声明
+private:
+     int a;
+};
+void aa::f()   // 3. 定义 f 此时可以使用Screen的成员
+{
+    Screen p;
+    p.a=1;
+    cout<<p.a<<endl;
+}
+int main()
+{
+    aa u;
+    u.f();
+}
+```
+
+尽管重载函数名字相同，但是仍是不同函数，如果想对一组重载函数都声明友元，得每一个都声明
+
+<h3 id='1-6-4'>类的作用域</h3>
+
+一个类就是一个作用域
+
+在我们将函数定义在类外时需要提供类名，在遇到类名后，定义的剩余部分就在类的作用域之内。如果我们要返回的类型也是类内命名的数据类型，那么之前也要提供类名 比如 aa中 定义了A类型数据  aa::A  aa:: f() {  } ，返回类型就是A类型
+
+#### 名字查找和类的作用域
+
+编译器处理完类中的全部声明之后才会处理成员函数的定义，如果在类外，就会只考虑在名字的使用前出现的声明
+
+类内找不到声明，会去外层作用域中寻找。在类中，如果成员使用了外层作用域的某个名字，那么这个名字不能被重新定义
+
+成员函数查找规则：1. 在成员函数中查找 2. 在类内查找， 3. 在成员函数之前的作用域找
+
+我们可以通过类的名字或显式的使用this指针来强制访问成员 this ->a 或 Screen::a
+
+当成员定义在类的外部时，名字查找的第三步不仅要考虑类定义之前的全局作用域中的声明，也要考虑成员函数定义之前的全局作用域中的声明
+
+<h3 id='1-6-5'>构造函数再探</h3>
+
+#### 构造函数初始值列表
+
+如果成员是const ，引用，或者属于某种为提供默认构造函数的类类型，我们必须通过构造函数列表为这些成员提供初始值
+
+构造函数初始值列表的初始化顺序和在类定义的出现顺序一致
+```c++
+class x{
+    int i;
+    int j;
+public:
+    x(int val): j(val),i(j){} //因为定义时i在前，所以i是先初始化，此时j未定义
+    void aa(){cout<<i<<" "<<j<<endl;} 
+};
+int main()
+{
+    x p(2);
+    p.aa(); // 结果为 4309678(未定义的) 2
+}
+```
+
+#### 委托构造函数
+
+```c++
+class aa{
+public:
+    aa(int i,int j,int k):i(i),j(j),k(k) {}
+
+    // 委托构造函数(其余构造函数都委托给另一个构造函数)
+    aa(): aa(0,0,0) {} 
+    aa(int i):aa(i,0,0) {}
+
+    void printff() {cout<<i<<' '<<j<<' '<<k<<endl;}
+private:
+    int i,j,k;
+};
+int main()
+{
+     aa p(2);
+     p.printff(); // 2 0  0
+}
+```
+
+#### 默认构造函数的作用
+
+如果定义了其他构造函数，最好也提供一个默认构造函数  = default;
+
+只有当一个类没有定义任何构造函数的时候，编译器才会自动生成一个默认构造函数。
+
+假定有一个名为 NoDefault 的类，它有一个接受 int 的构造函数，但是没有默认构造函数。定义类 C，C 有一个 NoDefault 类型的成员，定义C 的默认构造函数。
+```c++
+class NoDefault {
+public:
+    NoDefault(int i) { }
+};
+
+class C {
+public:
+    C() : def(0) { } 
+private:
+    NoDefault def;
+};
+```
+
+#### 隐式的类类型转换
+
+能通过一个实参调用的构造函数定义了一条从构造函数的参数类型向类类型隐式转换的规则
+```c++
+class aa{
+public:
+    aa(string i,int j,int k):i(i),j(j),k(k) {}
+      aa(string i):aa(i,0,0) {}
+    void printff() {cout<<i<<' '<<j<<' '<<k<<endl;}
+private:
+    string i;
+    int j,k;
+};
+int main()
+{
+     string s="we";
+     aa string1 = s; // 这样是可以的，通过隐式转换成了aa类型
+     // aa string2 = "we" 这样是不行的，因为编译器只会自动执行一步类型转换，
+                        //他要先从"we"转到string 再转成aa，有问题
+     string1.printff();
+}
+```
+通过 explicit抑制隐式转换，explicit只对一个实参的构造函数有用。因为需要多个实参的不能进行隐式转换
+```c++
+class aa{
+public:
+    aa(string i,int j,int k):i(i),j(j),k(k) {}
+     explicit aa(string i):aa(i,0,0) {} // 抑制隐式操作
+    void printff() {cout<<i<<' '<<j<<' '<<k<<endl;}
+private:
+    string i;
+    int j,k;
+};
+int main()
+{
+     string s="we";
+      aa string1 =s; //错误操作，因为没有支持隐式转换的构造函数了
+     string1.printff();
+}
+```
+
+当我们用，explicit关键字声明构造函数时，以后该函数只能以直接初始化的形式使用，不过我们可以显式强制转换
+```c++
+string s="we";
+aa string1 = (aa(s)); // 强制转换
+string1.printff();
+```
+
+#### 聚合类
+
+what:1. 所以成员都是public 2. 没有任何构造函数 3. 没有类内初始值 4. 没有基类也没有virtual函数
+
+我们可以用花括号括起来的成员初始值列表用来初始化集合类的数据成员:1. 初始值顺序必须与声明的顺序一致 2. 如果列表中元素小于类成员数，后面的成员被值初始化，个数不能超过成员数
+```c++
+struct node
+{
+    int a,b;
+};
+int main()
+{
+     node s={1,2};
+     cout<<s.a<<' '<<s.b<<endl; // 1 2
+}
+```
+
+#### 字面值常量类
+
+字面值常量类： 数据成员都是字面值类型的聚合类 或满足以下要求:1. 数据成员都是字面值类型 2. 类必须至少含有一个constexpr的构造函数 3. 如果一个数据成员有类内初始值，那么这个初始值必须是一条常量表达式 (或者成员属于某种类类型，初始值必须使用成员自己的constexpr构造函数) 4.  类必须使用析构函数的默认定义 ,该成员负责销毁类的对象 
+
+constexpr： 参数和返回值必须是字面值类型
+
+constexpr构造函数可以声明成=default 形式或者是删除函数的形式，必须初始化所以数据成员，初始值是constexpr构造函数或者是常量表达式
+
+<h3 id='1-6-6'>类的静态成员</h3>
+
+通过static关键字使得类的静态成员和类关联在一起(一旦改变，所以该类的对象获取到的数据都会改变)
+
+类的静态成员存在于任何对象之外，对象中不包含任何与静态成员有关的数据，不与任何对象绑在一块，不包含this指针
+
+访问： 我们可以作用域运算符直接访问静态成员，虽然静态成员不属于类的某个对象，但我们仍然可以用类的对象，引用或指针来访问静态成员
+
+定义： 
 
 
 
