@@ -42,7 +42,11 @@
 - [c++标准库](#2)
     - [IO库](#2-8)
         - [IO类](#2-8-1)
-
+        - [文件输入输出](#2-8-2)
+        - [string流](#2-8-3)
+    - [顺序容器](#2-9)
+        - [顺序容器概述](#2-9-1)
+        - [容器库概览](#2-9-2)
 
 <h1 id='1'>C++基础</h1>
 
@@ -2032,13 +2036,29 @@ constexpr构造函数可以声明成=default 形式或者是删除函数的形�
 
 <h3 id='2-8-1'>IO类</h3>
 
-cerr: 输出程序错误信息，写入到标准错误
-
+```c++
 `iostream`： 定义读写流的基本类型 `fstream`：定义读写命名文件的类型  `sstream`:定义读写内存string对象的类型
+
+#include <iostream>
+istream//从流中读取数据
+ostream//从流中写入数据
+iostream//读写流
+ 
+#include <fstream>//文件
+ifstream
+ofstream
+fstream
+ 
+#include <sstream>//字符串
+istringstream
+ostringstream
+iostringstream
+```
+cerr: 输出程序错误信息，写入到标准错误
 
 宽字符：wchar_t
 
-标准库通过`继承机制`使我们可以忽略不同类型流之间的差别。因为一个派生类(继承类)可以当做基类(所继承的类)使用
+标准库通过`继承机制`使我们可以忽略不同类型流之间的差别。因为一个派生类(继承类)可以当做基类(所继承的类)使用,fstream和sstream都继承于iostream,所以iostream有的操作他们都有
 
 #### `IO对象无拷贝或赋值`
 
@@ -2046,4 +2066,346 @@ cerr: 输出程序错误信息，写入到标准错误
 ，读写IO对象会改变其状态，所以不能加const
 
 #### `条件状态`
+
+```c++
+strm代表一种IO类型,流处于好的状态时这些bit位全部处于0。
+ 
+strm::iostate   iostate一种机器相关类型，提供了表达条件状态的完整功能
+strm::badbit    指出流已经崩溃,系统级错误，不可恢复
+strm::failbit   指出IO操作失败，比如int确读入char类型，可恢复
+strm::eofbit    指出流达到了文件的末尾
+strm::goodbit   指出流处于未错误状态
+
+```
+```c++
+s.eof()          若流处于eofbit,返回true
+s.fail()         若流处于failbit,返回true
+s.bad()          若流处于badbit,返回true
+s.good()         若流处于有效状态,返回true
+s.clear()        将流所有状态恢复，设置为有效，返回void
+s.clear(flag)    将指定bit位恢复，设置为有效，返回void。flag类型为strm::iostate
+s.setstate(flag) 根据给定的bit标志位，将流s中对应条件状态位置位。flag类型为strm::iostate
+s.rdstate()      读取当前的状态
+```
+
+```c++
+
+int 读入char后，得先将条件状态位复原，在清除缓存区中的错误缓存
+
+ int p;
+    for(int i=1;i<=5;i++)
+    {
+        cin>>p;
+        if(cin.fail()) 
+        {
+            cin.clear(); //复原
+            cout<<cin.get()<<endl; // 清除缓存
+        }
+        cout<<p<<endl;
+    }
+```
+
+####　管理输出缓存
+
+每个输出流有个缓存区，用来保存程序读写的数据。　有了缓存，操作系统可以将多个输出操作组合成单一的系统级写操作(提高性能)
+
+`缓存刷新` : 1. 程序正常结束 ，mian函数的return 操作会刷新缓存 2. 缓冲区慢  3. 操纵符 endl(输出换行，刷新)，flush(刷新)和ends (输出空字符，刷新)   4. 通过 unitbuf设置实时刷新 (nounitbuf恢复到正常) 5. 一个输出流关联到另一输出流(例如 cin和cerr和cout关联，读cin或写cerr会更新cout的缓冲区)
+
+```c++
+cout<< unitbuf; // 以后所有输出操作都会立刻刷新缓存区
+cout << nounitbuf; // 恢复正常
+```
+
+如果程序崩溃，输出缓冲区是不会刷新的
+
+关联输出和输入流
+
+tie ：1. 不带参数 ，返回指向输出流的指针(如果本对象关联到一个输出流，那就指向他，否则返回空指针) 2. 带参数， 接收一个指向ostream的指针，返回指向输出流的指针，再将自己关联到此ostream  (例如 x.tie(&o) 将流x关联到输出流o )
+```c++
+    cin.tie(&cout); // 将cin和cout关联，虽然cin和cout本来就关联
+    cout<<cin.tie()<<endl; //0x489940，cout地址
+    ostream *old_tie = cin.tie(nullptr);// old_tie值为cout地址，然后cin和空指针关联
+    cout<<old_tie<<endl;//0x489940
+    cin.tie(&cerr);  // cin和cerr关联，不推荐
+    cout<<cin.tie()<<endl;//0x489880
+    cin.tie(old_tie); // cin和cout关联
+    cout<<cin.tie()<<endl;//0x489940
+```
+
+</h3 id='2-8-2'>文件输入输出</h3>
+
+fstrem头文件定义了 ：ifstream从文件中读取数据  ，ofstream向一个文件写数据  ，fstream可以读写
+
+在使用基类型对象的地方，我们可以用继承类型的对象代替，(如可以用fstream代替 iostream& )
+
+```c++
+ifstream in("D:\\123.txt"); // 打开文件123.txt ，然后就和cin差不多，不过是从文件中读入
+ofstream out;     // 创建文件输出流
+out.open("D:\\3.txt"); // 绑定到D:\\3.txt，可以不存在，不存在自己会创建
+if (out) // 如果打开成功。流用open和文件关联起来，如果open失败，failbit会被置位。因为open可能会失败，所以检查流是个好习惯
+{
+string s;
+while(in>>s)
+{
+    out<<s<<endl;
+}
+out.close();当将流文件关联到另外一个文件时，必须用close关闭当前的文件。
+}
+
+当然一个frstream对象销毁时，会自动close
+
+123.txt ： 
+1234 3534 534dfgdf
+
+3.txt：
+1234
+3534
+534dfgdf
+```
+
+#### `文件模式`
+```
+fstream fs("文件名", mode); //mode就是文件模式
+
+in         以读的方式打开
+out        以写的方式打开     
+app        每次写操作前均定位到末尾(不加这个写的话是创建一个新文件写，会丢弃原文件)
+ate        打开文件后立刻定位到文件末尾
+trunc      截断文件(丢弃)
+binary     以二进制方式IO
+```
+我们要保留原文件记得加app
+```c++
+ofstream out;
+out.open("D:\\3.txt",ofstream::app); // 写 和 追加
+out<<"asda34d"<<endl;
+```
+
+<h3 id='2-8-3'>string流</h3>
+
+```c++
+三个IO
+istringstream
+ostringstream
+stringstream
+特有操作
+sstream strm;       strm是一个未绑定的stringstream对象
+sstream strm(s);    strm是一个sstream对象，保存s的一个拷贝,此构造函数是explicit的
+strm.str();         返回strm所保存的string的拷贝
+strm.str(s);        将string s拷贝到strm中，返回void
+```
+
+```c++
+struct node
+{
+    string name;// 名字
+    vector<string> p;//电话号码，可能有多个
+};
+using namespace std;
+int main()
+{
+    ifstream in("D:\\123.txt");
+    string line,word;
+    vector<node>kk; // 所有人信息的总和
+    while(getline(in,line)) // 从文件中一行行读入
+    {
+        node info;
+        istringstream record(line); // 对line中的每个单词进行处理，绑定到string读入流
+        record >>info.name; //第一个单词为人名
+        while(record>>word) // 后面单词都是手机号
+            info.p.push_back(word);
+        kk.push_back(info); 
+    }
+}
+
+```
+<h2 id='2-9'>顺序容器</h2>
+
+顺序容器： 提供控制元素存储和访问顺序的能力
+
+<h3 id='2-9-1'>顺序容器概述</h3>
+
+```c++
+
+#include <iterator>       //迭代器，包含c++11的begin() 和end()函数
+#include <array>          //c++11 数组类型，长度固定，提供了更好、更安全的接口，执行效率和内置数组相同，可以有效替代内置数组
+#include <valarray>       //c++11 值类型的数组类型，针对值类型的数组，有更多的操作，比如求和，最大最小数等。
+#include <list>           //双向链表,插入删除速度快,不支持随机访问
+#include <forward_list>   //c++11 单向链表,单向访问,插入删除速度快，不支持随机访问,没有size操作
+#include <deque>          //双端队列,支持快速随机访问 ，在中间插入很慢，但是在头尾插入很快
+#include <string>         //string类型,插入删除耗时。随机访问快，在尾部插入很快
+#include <vector>         //迭代器类型,插入删除耗时。随机访问快
+```
+string和vector为连续储存，随机访问快,但是插入数据时，会把后面的元素全部移动来保证连续储存
+
+list和forward_list 在哪里插入都很快，不支持随机访问，为了寻找一个元素我们得遍历一遍，有很多空间的额外开销
+
+通常，我们一般都选择vector
+
+<h3 id='2-9-2'>容器库概览</h3>
+
+类型别名 
+```
+iterator            迭代器
+const_iterator      const迭代器
+size_type           无符号整数类型(迭代器大小)
+different_type      带符号整数类型(迭代器距离)
+value_type          元素类型
+reference           元素左值类型，相当于 value_type&
+const_reference     元素const左值类型
+```
+构造函数
+```
+C a
+C a1(a2)
+C a(b,e)            构造a，将迭代器 b和e指定的范围内元素拷贝到a(array不支持)
+C a{u,i,o...}       列表初始化
+```
+赋值与swap (swap得容器重定义过`=`才行，因为swap用到了=)
+```
+c1=c2
+c1 = {a,b,c...}     c1元素装换为列表元素(array不支持)
+a.swap(b)
+swap(a,b) 
+```
+大小
+```
+c.size()            c中元素数
+c.max_size()        c可保存的最大元素数目
+c.empty()
+```
+添加/删除元素(不适应array)，不同容器中操作接口不同
+```
+c.insert( args )    将args中的元素拷贝进c
+c.emplace( inits )  使用inits构造c中一个元素
+c.erase( args )     删除args指定元素
+c.claer()           删除所以元素
+
+关系运算符 
+==   !=
+< ,<= ,>,  >=       (无序关联容器不支持)
+```
+获取迭代器
+```
+c.begin()
+c.end()
+c.cbegin()
+c.cend()
+```
+反向容器成员(不支持 forword_list)
+```
+reverse_iterator      按逆序寻址元素的迭代器
+const_reverse_iterator  
+c.rbegin() , c.rend()   返回指向c的尾元素和首元素之前位置的迭代器
+c.crbegin(), c.crend()
+```
+
+#### `迭代器`
+
+如果一个迭代器提供某个操作，那么所以提供相同操作的迭代器对这个操作的实现方法相同
+
+算术迭代器只适用于 vector ， string ， array ， deque 
+
+迭代器范围：[begin, end ) ,左闭右开区间
+```
+while(begin!=end)
+{
+
+}
+```
+#### `容器类型成员`
+
+需要元素类型  value_type ,需要元素类型的引用:reference或const_reference
+```c++
+list<deque<int>>a;
+list<deque<int>>::value_type p;
+list<deque<int>>::iterator it;
+auto k=a.begin();
+```
+为了读取string 的list 中的元素，应该使用什么类型？如果写入list，又应该使用什么类型？
+```c++
+list<string>::const_iterator // 读
+list<string>::iterator // 写
+```
+
+#### `容器定义和初始化`
+
+```c++
+vector<int> c1;  // 默认初始化
+vector<int> c2(c1);  // 拷贝初始化
+vector<int> c3{1,2,3}; // 列表初始化
+vector<int> c4(c1.begin(),c1.end()); // 迭代器初始化
+vector<int> c5(10);  // 10个元素初始化
+vector<int> c6(10,8); // 10个元素初始化为8
+```
+将一个容器初始化为另一个容器
+```c++
+list<string> lis1{"11","22","33"};
+vector<const char*> article={"aa","bb","cc"};
+
+list<string> lis2(lis1);
+
+//vector<string> v1(article); 错误，拷贝初始化，容器类型和元素类型都得相同
+
+deque<string> v1(article.begin(),article.end());  迭代器初始化，只要元素类型相同或能转换即可
+
+list<string>::iterator  it;
+it=lis1.begin();
+it++;
+vector<string>s(lis1.begin(),it); // 11
+```
+
+列表初始化 ，元素类型是内置类型或具有默认构造函数类型，可以只提供容器大小，否则得指定显示的元素初始值
+```
+vector<int> s(10,1)  提供了容器大小和类型初始值
+```
+
+> 标准array具有固定大小
+```c++
+array<int ,10> s; // 创建array数组，需要元素类型和容器大小
+```
+array内元素都被默认初始化。array可以进行拷贝
+```c++
+array<int,5>p={1,23,4};
+array<int,5> o= p;
+```
+
+#### `赋值和swap`
+
+array不支持assign,也不允许用花括号包围的值列表进行赋值(codeblock好像可以赋值。。)
+
+赋值相关操作会导致指向左边容器内部的迭代器，引用和指针实现，而swap不会使其失效(除了array和string)
+
+赋值
+```
+c1=c2
+
+c={a,b,c..}         替换为初始化列表中元素的拷贝(array不适用)
+
+swap(c1,c2)
+c1.swap(c2)
+
+assign操作不适用于关联容器和array
+seq.assign(b,e)     seq元素替换为b,e迭代器范围内的元素，但是b，e不能指向seq的元素
+
+seq.assign(il)      seq转换为初始化列表il中的元素   p.assign({123,3,5});
+
+seq.assign(n,t)     seq元素替换为n个值为t的元素
+```
+
+assgin支持类型的转化。但是传递给assgin的迭代器不能指向本身其中的元素
+
+容器 swap操作很快，因为元素本身为交换，只是交换了两个容器的内部数据结构。元素本身不会移动，
+
+对string进行swap会使指向容器的迭代器，引用，指针失效
+
+对array进行swap会真正交换元素，所以时间和元素个数成正比，因此指针，引用，迭代器所绑定元素不变，不过元素值改变了
+
+#### `容器大小操作`
+
+forward_list 支持max_size和empty但不支持size
+
+#### `关系运算符`
+
+
 
