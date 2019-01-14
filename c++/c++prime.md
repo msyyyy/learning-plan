@@ -47,6 +47,7 @@
     - [顺序容器](#2-9)
         - [顺序容器概述](#2-9-1)
         - [容器库概览](#2-9-2)
+        - [顺序容器操作](#2-9-3)
 
 <h1 id='1'>C++基础</h1>
 
@@ -2407,5 +2408,99 @@ forward_list 支持max_size和empty但不支持size
 
 #### `关系运算符`
 
+每个容器都支持 == 和!= ,但是比较运算符< ,>等运算符两边都得是相同类型的容器，比较规则和string相似
 
+相等运算符=通过 == 运算符实现，比较运算符通过 < 运算符实现
 
+<h3 id='2-9-3'>顺序容器操作</h3>
+
+顺序容器和管理容器的不同之处在于两者组织元素的方式
+
+向一个vector和string和deque插入元素会使所有指向容器的迭代器，引用和指针失效
+```c++
+deque<int>v1{1,2,3};
+deque<int>v2{7,8,9};
+v1.push_back(4);             // 尾部创建,返回void
+v1.emplace_back(5);          //速度比push_back快
+v2.push_front(6);            // 头部，vector不支持,返回void
+v2.emplace_front(5);
+deque<int>::iterator it=v1.begin()+2;       //z指向3的迭代器
+deque<int>::iterator it2=v1.insert(it,6);   // 在迭代器it指向的元素之前插入6，返回指向6的迭代器
+deque<int>::iterator it3=v1.emplace(it2,7); //返回指向7的迭代器
+deque<int>::iterator it4=v1.insert(it3,5,1);// 在it3之前插入5个1，返回指向第一个新添加的元素
+deque<int>::iterator it5=v1.insert(it4,v2.begin(),v2.end());// 将迭代器范围内的元素插入到it4之前，
+                                        //迭代器范围不能是指向v1的元素,返回指向第一个新添加的元素
+v1.insert(it5,{9,9,9});//插入元素值列表，返回指向第一个新添加的元素
+
+for(auto k:v1)
+    cout<<k<<' ';//  1 2 9 9 9 5 6 7 8 9 1 1 1 1 1 7 6 3 4 5
+    
+// 向一个vector和string和deque插入元素会使所有指向容器的迭代器，引用和指针失效
+```
+
+向`vector和string除尾部`之外的位置或者`deque除首尾`之外的任何位置添加元素，都需要`移动元素`。
+因为vector和string的分配内存是2倍增加的，超过一定内存需要扩大两倍，需要重新分配空间然后将元素从旧空间移动到新空间
+
+我们用一个对象初始化容器或者将对象插入到容器，其实放入的是对象值的一个拷贝
+
+insert操作除了vector和string尾部，或deque首位都很耗时
+
+`emplace操作`:push或insert是将元素类型对象传递给他们，这些对象被拷贝到容器中，而emplace是将参数传递给`元素类型的构造函数`,在容器管理内存中直接构造，速度快
+
+emplace函数在容器中直接构造元素，传递给emplace的函数的参数必须与元素类型的构造函数匹配
+```c++
+struct node
+{
+    node(int a,int b): a(a),b(b){}
+    int a, b;
+};
+int main()
+{
+    vector<node>v; 
+    v.emplace_back(1,2); // 可以传递参数给元素的构造函数，在容器中直接构造
+    // v.push_back(5,4); 不能这么操作，因为是传递对象
+    v.push_back(node(5,4));  
+}
+```
+
+#### `访问元素`
+
+在调用front,back(或解引用迭代器之前)要确保容器非空(!c.empty())
+
+访问成员函数返回的都是引用，我们可以改变元素的值
+```c++
+vector<int>v{1,2,3,4,5,6,7};
+cout<< v.back() <<endl;     // 返回v中尾元素的引用,7
+cout<< v.front() <<endl;    // 返回v中首元素的引用,1
+cout<< v[3] <<endl;         // 返回v中下标为n的引用,4, 如果越界，行为未定义
+cout<< v.at(3) <<endl;      //返回v中下标为n的引用,4, 如果越界，抛出 out_of_range异常
+cout<< v.at[7] <<endl;      // 抛出异常
+```
+
+#### `删除元素`
+
+删除deque中除首尾之外的元素会使其任何迭代器，引用和指针失效,指向vector或string`删除点之后`任何位置的迭代器,引用和指针失效(因为他们都是`顺序容器`)
+```c++
+//array无这些操作，因为这些操作会改变容器大小
+
+// forward_list 不支持pop_back
+//  vector 和string 不支持pop_front
+deque<int>v{0,1,2,3,4,5,6,7,8,9,10};
+v.pop_back();//删除v中为元素，返回void
+// 0 1 2 3 4 5 6 7 8 9
+v.pop_front();// 删除v中首元素,返回void
+//1 2 3 4 5 6 7 8 9
+deque<int>::iterator it=v.begin()+2;
+deque<int>::iterator it1 = v.erase(it); // 删除迭代器it指定元素，返回一个被删元素之后的元素迭代器
+//1 2 4 5 6 7 8 9,    it1指向元素4
+deque<int>::iterator it2=v.begin()+4;   //指向元素6
+deque<int>::iterator it3=v.erase(it1,it2);//删除范围中的元素(左闭右开),返回最后一个被删除元素之后的元素迭代器，即指向it2原本所指元素
+// 1 2 6 7 8 9
+v.clear();//删除v中所有元素，返回void
+```
+```c++
+int ia[]={0,1,2,3,4,5,6,7,8,9,10};
+  vector<int>v(begin(ia),end(ia));
+```
+
+`特殊的forward_list操作`
