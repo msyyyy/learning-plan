@@ -48,6 +48,8 @@
         - [顺序容器概述](#2-9-1)
         - [容器库概览](#2-9-2)
         - [顺序容器操作](#2-9-3)
+        - [vector对象是如何增长的](#2-9-4)
+        - [额外的string操作](#2-9-5)
 
 <h1 id='1'>C++基础</h1>
 
@@ -2504,3 +2506,137 @@ int ia[]={0,1,2,3,4,5,6,7,8,9,10};
 ```
 
 `特殊的forward_list操作`
+
+forward_list:单向链表，因为单向链表不能很好的访问前驱，只能访问后驱，所以我们添加或删除元素都是通过改变给定元素之后的元素来进行操作
+
+```c++
+forward_list<int> v={0,1,2,3};
+vector<int> p = {7,7,7};
+auto it = v.before_begin();// 返回指向首元素之前不存在的元素迭代器，不能解引用
+// auto it = v.cbefore_begin();
+
+auto it1 = v.insert_after(it,9); //在it之后的位置插入9，返回指向最后一个插入元素的迭代器，返回指向9的迭代器
+// 9 0 1 2 3
+auto it2 = v.insert_after(it1,2,8); // 返回指向最后一个8的迭代器
+// 9 8 8 0 1 2 3
+auto it3 = v.insert_after(it2,p.begin(),p.end());
+// 9 8 8 7 7 7 0 1 2 3
+auto it4 = v.insert_after(it3,{6,6});
+// 9 8 8 7 7 7 6 6 0 1 2 3
+auto it5 = v.emplace_after(it4,5); // 返回指向5的迭代器
+// 9 8 8 7 7 7 6 6 5 0 1 2 3
+auto it6 = v.erase_after(it5); // 删除it5指向元素的后一位元素，返回指向1的迭代器
+// 9 8 8 7 7 7 6 6 5 1 2 3
+auto it7 = v.before_begin();  // 指向首元素之前
+    it7++;           //指向首元素
+auto it8 = v.erase_after(it7,it6); // it7指向 9 ，it6 指向1 ，删除it7之后和不包括it6 范围内的元素,返回指向1的迭代器
+// 9 1 2 3
+```
+
+#### `改变容器大小`
+
+resize ，如果当前大小大于所要求大小，容器后部元素会被删除，如果当前大小小于新大小，会将新元素添加到后面
+```
+vector<int>v(5,42);
+v.resize(2);            // 42 42
+v.resize(6,-1);         // 42 42 -1 -1 -1 -1
+v.resize(7);            // 42 42 -1 -1 -1 -1 0
+```
+
+#### `容器操作可能是迭代器失效`
+
+对应list和forward_list ，添加或删除元素，指向容器的迭代器，指针，引用都仍有效
+
+deque 在除首尾的其他位置添加或删除，全失效， 添加首尾，迭代器失效，指针和引用有用，删除首，全部无影响，删除尾，尾后迭代器失效，指针和引用有效
+
+string和vector ,插入如果存储空间不重新分配，那么和删除一样，插入之前的迭代器，指针，引用有效，之后的都无效，重新分配，都无效
+
+每次添加或删除元素时，记得更新迭代器，引用或指针，我们不需要保存end返回的迭代器，因为他添加或删除元素后都会失效
+
+</h3 id='2-9-4'>vector对象是如何增长的</h3>
+
+管理容量的成员函数:
+```c++
+vector<int>v(5,42);
+v.push_back(9);
+cout<<v.capacity()<<endl; // 计算v不重新分配空间，可以保存多少元素，10
+v.reserve(50);            // 分配至少能容纳50个元素的空间
+cout<<v.capacity()<<endl; // 50
+v.shrink_to_fit();        // 将capacity()减少为size()相同大小
+cout<<v.capacity()<<endl; // 6
+v.reserve(1);             // 分配的空间不会少于当前元素大小
+cout<<v.capacity()<<endl; // 10
+```
+
+当size大于capacity时，容器就会重新分配空间，这时候所以元素都会移动
+
+<h3 id='2-9-5'>额外的string操作</h3>
+
+构造string
+```c++
+const char *cp = "hello world!!!"; // 以空字符结束的数组
+char nonull[] = {'h','i'}; // 不以空字符结束
+string s1(cp);// 拷贝cp直到遇到空字符
+// hello world!!!
+string s2(nonull,2);// 从nonull中拷贝两个字符，hi
+string s3(nonull); // 错误， 因为nonull结尾无空字符
+string s4(cp+6,5); // 从cp[6]开始拷贝，拷贝5个字符,world
+string s5(s1,6,5); // 从s[6]开始拷贝，拷贝5个字符,world
+string s6(s1,6);// 从s[6]开始拷贝，拷贝到末尾  world!!!
+string s7(s1,6,100);// 从s[6]开始拷贝，只拷贝到末尾  world!!!
+string s8(s1,100);// 抛出out_of_range异常
+```
+`substr`操作返回一个string,传递一个开始位置和可选的长度(不加长度就到末尾为止)
+
+`append`:在string末尾进行插入操作的简写
+
+`replace`:替换 s.replace(11,3,"5th")；删除s[11]开始的3个字符，然后插入"5th"
+
+args形式
+```
+str
+str,pos,len
+cp,len  cp指向的字符数组，长度为len
+cp
+n,c     n个c
+b,e     迭代器
+初始化列表
+```
+
+#### `string搜索操作`
+
+搜索返回size_type值，如果搜索失败，返回npos，初始化为-1，因为npos为无符号整形，-1其实为任何string最大的可能大小
+
+```
+s.find(args)                    查找s中args第一次出现位置
+s.rfind(args)                   查找s中args最后一次出现位置
+s.find_first_of(args)           在s中查找args任何一个字符第一次出现的位置
+s.find_last_of(args)            在s中查找args任何一个字符最后一次出现的位置
+s.find_first_not_of(args)       在s中查找第一个不在args中的字符的位置
+s.find_last_not_of(args)        在s中查找最后一个不在args中的字符的位置
+
+args形式
+c,pos           s中位置pos开始查找字符c，pos默认0
+s2,pos          从s中位置pos查找字符串s2，pos默认0
+cp,pos          从s中位置pos查找c风格字符串，pos默认0
+cp,pos,n        从s中位置pos查找cp所指数组的前n个字符，pos默认0
+```
+
+#### `compare函数`
+
+比较函数
+s.cpmpare(args)
+```
+args形式
+
+s2
+pos1,n1,s2   
+pos1,n1,s2,pos2,n2   s中从pos1开始的n1个字符与s2从pos2开始的n2个字符比较
+
+cp
+pos1,n1,cp
+pos1,n1,cp,n2
+```
+
+#### `数值转换`
+
