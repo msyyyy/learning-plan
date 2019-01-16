@@ -50,6 +50,12 @@
         - [顺序容器操作](#2-9-3)
         - [vector对象是如何增长的](#2-9-4)
         - [额外的string操作](#2-9-5)
+        - [容器适配器](#2-9-6)
+    - [泛型算法](#2-10)
+        - [概述](#2-10-1)
+        - [初识泛型算法](#2-10-2)
+        - [定制操作](#2-10-3)
+        - [再探迭代器](#2-10-4)
 
 <h1 id='1'>C++基础</h1>
 
@@ -2639,4 +2645,234 @@ pos1,n1,cp,n2
 ```
 
 #### `数值转换`
+
+<h3 id='2-9-6'>容器适配器</h3>
+
+stack栈,queue队列和priority_queue优先队列
+
+<h2 id='2-10'>泛型算法</h2>
+
+泛型算法:可以作用于不同类型的与那是和多种容器类型
+
+<h3 id='2-10-1'>概述</h3>
+
+算法本身不会执行容器的操作，他们只会运行于迭代器之上
+
+<h3 id='2-10-2'>初识泛型算法</h3>
+
+#### `只读算法`
+
+1. accmulate，接收三个函数，前两个是求和的范围，后一个是初值
+```
+vector<int>v{1,2,3};
+string s({'1','2','3'});
+cout<< accumulate(v.begin(),v.end(),0)<<endl;               // 6
+cout<< accumulate(s.begin(),s.end(),string(""))<<endl;      // 123
+cout<< accumulate(s.begin(),s.end(),""))<<endl; //报错，因为""为const char*，没有+号运算符
+```
+注意 给定初值的类型
+```c++
+vector<double>v{1.2,2,3};
+cout<< accumulate(v.begin(),v.end(),0)<<endl;// 会输出6
+```
+
+2. equal比较两个序列是否保存相同的值,给定三个值，前两个是第一个元素范围，最后是第二个元素列表的首元素，长度和第一个范围一样长
+
+```c++
+vector<int>v1{1,2,3};
+vector<int>v2{1,2,3,4,5};
+cout<<equal(v1.cbegin(),v1.cend(),v1.cbegin())<<endl; // 输出为1
+
+vector<string>v1={"1","2"};
+vector<const char*>v2={"1","2","3"};
+cout<<equal(v1.begin(),v1.end(),v2.begin())<<endl;// 1
+```
+
+#### `写容器的算法`
+
+向目的位置写入数据的算法要保证能容纳要写入的元素
+
+file_n(dest,n,val)，dest为迭代器，向dest开始的序列至少要包含n个元素，这些元素都被重置为val
+
+back_inserter接受一个指向容器的引用，返回一个与该容器绑定的插入迭代器。当我们对这个迭代器赋值时，赋值运算符会调用push_back将一个具有定值的元素添加到元素
+
+```c++
+vector<int>v{1,2,3};
+auto it=back_inserter(v);
+*it=42;// 1 2 3 42
+fill_n(back_inserter(v),3,5);//1 2 3 42 5 5 5
+```
+
+copy,接收三个迭代器，前两个拷贝范围，后一个目的起始位置copy返回拷贝到目的的元素的尾元素后面的元素
+```c++
+vector<int>v{1,2,3};
+vector<int>v1{5,6,7,8,9};
+auto ret = copy(v.begin(),v.end(),v1.begin());//1 2 3 8 9,ret是指向8的迭代器
+```
+replace读入一个序列，将其中的等于给定值的元素都改为另一个值
+```c++
+vector<int>v{1,2,3,1};
+vector<int>v1{5,5,5,8,9};
+replace(v.begin(),v.end(),1,9);// 9 2 3 9，改变了v的值
+replace_copy(v1.begin(),v1.end(),back_inserter(v),5,4);
+// v的值 9 2 3 9 4 4 4 8 9
+// v1的值 5 5 5 8 9
+```
+
+#### `重排容器元素的算法`
+
+sort通过< 运算符实现
+
+排序去重
+```c++
+vector<int>v{9,9,8,8,5,3,2,2};
+sort(v.begin(),v.end());//2 2 3 5 8 8 9 9
+auto end_unique = unique(v.begin(),v.end());// 2 3 5 8 9 8 9 9，
+//返回指向第一个重复元素的指针，指向后面的8
+v.erase(end_unique,v.end());// 2 3 5 8 9
+```
+
+<h3 id='2-10-3'>定制操作</h3>
+
+#### `向算法传递函数`
+
+谓词：可调用的表达式，其返回结果是一个能用作条件的值
+
+```c++
+bool cmp(const string &s1,const string &s2)
+{
+    if(s1.size()==s2.size())
+        return s1<s2;
+    return s1.size()<s2.size();
+}
+int main()
+{
+   vector<string>v{"asd","gd","fhe","rgd","asdf"};
+   sort(v.begin(),v.end(),cmp);
+   // gd asd fhe rgd asdf
+}
+```
+
+#### `lambda表达式`
+
+lambda(匿名函数)，有 一个捕获列表，一个返回类型，一个参数列表，一个函数体(一定要有 捕获列表和函数体)
+
+一个lambda没有默认参数，调用的实参数一定和形参数相等
+```c++
+vector<string>v{"asd","gd","rhe","bgd","asdf"};
+sort(v.begin(),v.end(),[](const string &s1,const string &s2){return s1.size()<s2.size();});//按长度排序
+int sz=3;
+auto wc = find_if(v.begin(),v.end(),[sz](const string &s1){return s1.size()>=sz;});// 返回第一个满足长度大于sz的元素的迭代器
+for(auto it=wc;it!=v.end();++it)
+cout<<*it<<' '; // asd rhe bgd asdf
+```
+
+#### `lambda捕获和返回`
+
+定义lambda时，编译器定义了一个新类型并创建该类型的一个对象
+
+值捕获:
+```c++
+int a=42;
+auto f = [a]{return a;};
+a=0;
+cout<<f()<<endl;//42
+```
+引用捕获,必须确保在lambda执行时变量是存在的
+```c++
+int a=42;
+auto f = [&a]{return a;};
+a=0;
+cout<<f()<<endl;//0
+```
+隐式捕获,让编译器根据lambda中的代码推断我们要使用哪些变量，&表示采用捕获引用方式，=表示采用值捕获
+```c++
+int a=42,b=42;
+auto f1 = [&]{return a;};
+auto f2 = [=]{return b;};
+a=0,b=0;
+cout<<f1()<<' '<<f2()<<endl;//0 42
+
+混合
+int a=42,b=42;
+auto f1 = [&,b]{cout<<a<<' '<<b<<endl;};
+a=0,b=0;
+f1();// 0 42
+```
+可变lambad，我们想要改变拷贝得到的值.
+```c++
+int a=42;
+auto f1 = [=]()mutable{a++;cout<<a<<endl;};// 43
+f1();
+cout<<a<<' '<<endl; // 42
+```
+
+指定返回类型
+```c++
+[](int i)-> int { return i;};
+```
+#### `参数绑定`
+
+通过绑定来代替lambda
+```c++
+using namespace std;
+using namespace std::placeholders; // _n类型的占位符都在这个命名空间中
+bool check_size(const string &s,string::size_type sz)
+{
+    return s.size()>=sz;
+}
+int main()
+{
+    vector<string>v{"asd","gd","rhe","bgd","asdf"};
+    sort(v.begin(),v.end(),[](const string &s1,const string &s2){return s1.size()<s2.size();});
+    int sz=3;
+    //auto wc = find_if(v.begin(),v.end(),[sz](const string &s1){return s1.size()>=sz;});
+    auto check6 = bind(check_size, _1,sz ); // 
+    auto wc = find_if(v.begin(),v.end(),bind(check_size, _1,sz ));
+    //_1为占位符，绑定到check_size函数，第二个形参被绑定为sz
+    for(auto it=wc;it!=v.end();++it)
+    cout<<*it<<' ';
+}
+```
+bind参数
+```c++
+using namespace std::placeholders;
+void confun(int a,int b,int c)
+{
+	cout << "a=" << a << ends << "b=" << b << ends << "c=" << c << endl;
+}
+int main(void)
+{
+	auto con = bind(confun, 3, _2, _1);// 第二形参是第二实参，第三形参是第一实参
+	con(5,4); //a=3 b=4 c=5 
+}
+
+
+vector<string>v{"asd","gd","rhe","bgd","asdf"};
+// 由短到长排序 gd asd rhe bgd asdf
+sort(v.begin(),v.end(),cmp);
+// 由长到短排序
+sort(v.begin(),v.end(),bind(cmp,_2,_1));
+```
+
+如果我们想bind传递引用，使用ref函数，或cref返回const 引用
+```C++
+void confun(int &a,int b,int c)
+{
+	cout << "a=" << a++ << ends << "b=" << b << ends << "c=" << c << endl;
+}
+int main(void)
+{
+    int sz=3;
+	auto con = bind(confun, ref(sz), _2, _1);// 第二形参是第二实参，第三形参是第一实参
+	con(5,4); //a=3 b=4 c=5
+	cout<<sz<<endl;// 4
+}
+```
+
+<h3 id='2-10-4'>再探迭代器</h3>
+
+插入迭代器，流迭代器，反向迭代器，移动迭代器
+
+####  `插入迭代器`
 
