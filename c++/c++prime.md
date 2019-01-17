@@ -56,6 +56,12 @@
         - [初识泛型算法](#2-10-2)
         - [定制操作](#2-10-3)
         - [再探迭代器](#2-10-4)
+        - [泛型算法结构](#2-10-5)
+        - [特定容器算法](#2-10-6)
+    - [关联容器](#2-11)
+        - [使用关联容器](#2-11-1)
+        - [关联容器概述](#2-11-2)
+        - [关联容器操作](#2-11-3)
 
 <h1 id='1'>C++基础</h1>
 
@@ -2876,3 +2882,326 @@ int main(void)
 
 ####  `插入迭代器`
 
+```
+it = t;  在it指定的当前位置插入值t
+
+*it，++it,it++ ;   操作不会做任何事，每个操作都返回it
+
+```
+
+back_inserter : 创建使用push_back的迭代器
+
+front_inserter: 创建使用push_front的迭代器
+
+inserter: 创建使用insert的迭代器，接受第二个参数(指向给定容器的迭代器)，元素插入到给定迭代器之前,返回的还是原本的迭代器
+
+```c++
+vector<int>v{1,2,3,4};
+auto it=v.begin()+3;
+auto it1=inserter(v,it);
+it1 = 6;//1 2 3 6 4
+it1 = 7;//1 2 3 6 7 4
+```
+
+#### `流迭代器`
+
+istream_iterator 读入流 , ostream_iterator 向输出流读写数据
+
+```c++
+vector<string>v;
+// in(cin)表示关联到cin，定义时读一个
+// eof是可以当尾后迭代器使用
+istream_iterator<string> in(cin),eof;
+// out和cout关联，每次遇上他就输出，顺便输出\n
+cout<<*in<<endl; // 输出一开始读入的
+ostream_iterator<string>out(cout,"\n");
+// 将刚刚输出的in值全部插入到v后面，eof是尾后迭代器
+v.insert(v.end(),in,eof);
+// 将v中的值都复制到out中，因为调用out每个值都会被输出而且每个值后面会有\n
+copy(v.begin(),v.end(),out);
+
+//windouw : cotl + z 表示输入结尾
+
+istream_iterator<string> in(cin),eof; //会先读入一个
+for(int i=0;i<5;i++)
+{
+    cout<<(*in)<<' ';//输出
+    ++in; // 在读入一个，不过in不会自动升序，我们得++
+}
+读入 1 2 3 4 5 6
+输出 1 2 3 4 5
+
+ostream_iterator<string>out(cout,"\n");
+for(int i=0;i<5;i++)
+{
+    string s="";
+    s+=i+'0';
+    out=s; //赋值然后输出,每输出一个out会自动升序，指向下一个out
+}
+输出
+0
+1
+2
+3
+4
+```
+
+istream_iterator操作
+```
+istream_iterator<T> in(is);         in从输入流is读取类型为T的值
+istream_iterator<T> eof;            读取类型为T的尾后迭代器
+*in                                 返回流中读取的值
+in1 == in2
+in1 != in2
+in ->mem(等于 (*in).mem )
+++in
+in++           
+```
+
+```c++
+istream_iterator<string> in(cin),eof;
+for(int i=0;i<5;i++)
+{
+    cout<<*in++;// 读取下一条记录并将第一个记录输出s
+}
+```
+
+```c++
+ifstream in3("D:\\3.txt");
+istream_iterator<string> in(in3),eof;
+vector<string>v(in,eof);
+for(auto k:v)
+    cout<<k<<' ';
+
+3.txt
+
+asda34d
+a234da34d
+
+输出
+asda34d a234da34d
+```
+
+#### `反向迭代器`
+
+```c++
+vector<string>v{"abcd","efg","hig"};
+for(auto it=v.rbegin();it!=v.rend();it++)
+    cout<<*it<<' '; 
+// hig efg abcd
+```
+
+<h3 id='2-10-5'>泛型算法结构</h3>
+
+迭代器类型: 1.输入迭代器 2. 输出迭代器 3.前向迭代器 4.双向迭代器 5. 随机访问迭代器
+
+```
+输入迭代器,顺序访问
+1. == 和！=
+2. ++
+3. * (解引用只出现在赋值运算符的右侧)
+* ->
+
+find和accumulate 要求输入迭代器
+istream_iterator 是输入迭代器
+
+输出迭代器，单遍扫描
+1. ++
+2. * (解引用只出现在赋值运算符的左侧)
+
+copy的第三个参数和ostream_iterator 是输出迭代器
+
+前向迭代器，可以读写，不过只能沿一个方向
+
+replace迭代器和forward_list迭代器
+
+双向迭代器
+
+除了forward_list以外的标准库
+
+随机访问迭代器
+1.双向迭代器所有功能
+2.<, > ,<= ,>=
+3.+,+=,-,-=
+4.iter[n]
+
+sort,array ,deque,string,vector,用于访问数组元素的指针
+
+```
+
+为防止重载歧义，一般能接收谓词的都有_if版本，例如find_if()
+
+拷贝元素版本提供_copy，在提供一个目的位置迭代器表示拷贝的目的位置,例如reverse_copy(beg,end,dest)
+
+_copy和_if可以连用 remove_copy_if(beg,end,dest,pred)
+
+<h3 id='2-10-6'>特定容器算法</h3>
+
+对于list和forward_list，可以通过改变元素链接实现`交换`，而不需要真的交换，提高效率
+
+```c++
+bool cmp(const int &a)
+{
+    if(a==6) return 1;
+    return 0;
+}
+bool cmp2(const int &a,const int &b)
+{
+    return a>b;
+}
+int main(void)
+{
+   list<int>lst1{2,1,3},lst2{6,7,8};
+   lst1.merge(lst2);//将lst2合并入lst1,lst2元素删除
+   // lst1      2 1 3 6 7 8
+   // lst2
+   lst1.remove(2);// 去掉所有值为2的元素
+   // lst1       1 3 6 7 8
+   lst1.remove_if(cmp);// 去掉所有另cmp为真的元素
+    // lst1      1 3 7 8
+    lst1.reverse();// 反转
+    // lst1      8 7 3 1
+    lst1.sort();//使用<排序
+    // lst1      1 3 7 8
+    lst1.sort(cmp2);// 根据cmp2排序
+    // lst1      8 7 3 1
+    lst1.push_back(1);
+    // lst1      8 7 3 1 1
+    lst1.unique();//删除同一个值的连续拷贝
+    // lst1      8 7 3 1
+}
+
+```
+
+<h2 id='2-11'>关联容器</h2>
+
+按`关键词`来保存和访问的,map和set
+
+```
+按关键字保存有序元素
+
+map             关联数组：保存 关键字-值 对
+set             关键字即值，只保存关键字的容器
+multimap        关键字可重复出现
+multiset        关键字可重复出现
+
+无序集合
+
+unordered_map           用哈希函数组织的map 
+unordered_set           用哈希函数组织的set
+unordered_multimap      哈希组织的map，关键字可以重复出现
+unordered_multiset      哈希组织的set，关键字可以重复出现
+```
+
+<h3 id='2-11-1'>使用关联容器</h3>
+
+map可以使用 e.first  ,e.second 
+
+<h3 id='2-11-2'>关联容器概述</h3>
+
+关联容器不支持顺序容器的位置相关操作，例如push_front和push_back，也不支持构造函数和插入操作
+
+关联容器的迭代器都是双向的
+
+#### `定义关联容器`
+
+可以列表初始化，但是map每一对得用{ }
+```c++
+map<string,int>m{ {"a",1},{"bb",2} };
+set<string>s{"a","bb","cc"};
+for(auto k:m)
+    cout<<k.first<<' '<<k.second<<' ';//a 1 bb 2
+for(auto k:s)
+    cout<<k<<' ';// a bb cc
+```
+
+map和set关键字唯一，multiset和multimap则可以出现多个相同关键字
+
+#### `关键字类型的要求`
+
+```c++
+struct node
+{
+    string s;
+    int t;
+    node(const string &s,const int &t): s(s),t(t) {}
+};
+bool cmp(const node &n1,const node &n2)
+{
+    if(n1.s.size()==n2.s.size())
+        return n1.t<n2.t;
+    return n1.s.size()<n2.s.size();
+}
+int main()
+{
+    //为了使用自己比较的操作，定义时提供两个参数：关键字参数类型node和比较操作类型(函数指针类型，指向cmp)
+    multiset<node,decltype(cmp)*>sett(cmp);
+    sett.insert(node("a123da",3234));
+    sett.insert(node("asda",32));
+    sett.insert(node("asddda",32));
+    for(auto k:sett)
+        cout<<k.s<<' '<<k.t<<' ';
+    //asda 32 asddda 32 a123da 3234
+}
+```
+
+#### `pair类型`
+
+定义在头文件utility中，一个pair保存两个数据成员，是用来生成特定类型的模版
+
+pair的数据成员是public类型的，两个成员被命名为first和second
+```
+pair<int,int>p1;   //  默认初始化
+pair<int,int>p2(3,4);
+pair<int,int>p4={7,8};
+auto p3 = make_pair(2,5);
+```
+pair对象的函数
+```c++
+pair<string,int> aa(vector<string> &v)
+{
+    if(!v.empty())
+        return {v.back(),v.back().size()};// 尾元素和尾元素长度
+        // return make_pair(v.back(),v.back().size()); 也行
+    else
+        return pair<string,int> ();// 隐式构造返回值
+}
+```
+
+<h3 id='2-11-3'>关联容器操作</h3>
+
+关联容器额外的类型别名
+```
+key_type        此容器的关键字类型
+
+mapped_type     map容器才有，值类型
+
+value_type      set的话和key_type相同， map为pair<key_type,mapped_type>类型
+```
+
+#### `关联容器迭代器`
+
+当解引用关联容器迭代器时，得到value_type类型，但是，我们可以修改值类型，但是不能修改关键字类型(const )
+
+当使用迭代器遍历map,multimap,set和multiset时，迭代器按关键字升序遍历元素
+```c++
+map<int,int>m;
+m[2]=2;
+m[1]=1;
+auto it=m.cbegin();
+while(it!=m.cend())
+{
+    cout<<it->first<<' '<<it->second<<' ';
+    ++it;
+}
+// 1 1 2 2
+```
+#### `添加元素`
+
+关联容器insert成员向容器中添加一个元素或一个元素范围，添加已存在元素对容器无影响
+
+```c++
+map<string,int>m;
+m.insert({"word",1});
+m.insert(make_pair("asd",2));
+```
