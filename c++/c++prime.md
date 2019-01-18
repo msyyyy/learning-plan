@@ -62,6 +62,10 @@
         - [使用关联容器](#2-11-1)
         - [关联容器概述](#2-11-2)
         - [关联容器操作](#2-11-3)
+        - [无序容器](#2-11-4)
+    - [动态内存](#2-12)
+        - [动态内存与智能指针](#2-12-1)
+
 
 <h1 id='1'>C++基础</h1>
 
@@ -3204,4 +3208,229 @@ while(it!=m.cend())
 map<string,int>m;
 m.insert({"word",1});
 m.insert(make_pair("asd",2));
+auto p=m.emplace(make_pair("adsd",3));
+cout<<p.first->first<<' '<<p.second<<endl;// first是指向具有指定关键字的指针，second是指示是否插入成功的bool值
+// adsd 1
+
+vector<pair<string,int>> v{{"d",2},{"as",4}};
+m.insert(v.begin(),v.end());
+
+m.insert({{"34d",2},{"a6s",4}});
+
+m.insert(p.first,{"dad",4});
+
+m.emplace(p.first,{"dad",4});
 ```
+
+#### `删除元素`
+
+```
+c.erase(k)    从c中删除每个关键字为k的元素，返回一个size_type指出删除元素的数量
+c.erase(p)     p为迭代器，且p不能为c.end，删除p所指元素，返回指向p之后的迭代器
+c.erase(b,e)    删除迭代器b,e所表示范围内的元素，返回e
+```
+
+####   `map的下标操作`
+
+```c++
+map<string,int>m;
+m["a"]=1;
+m["b"];//访问关键字为“b”的元素,默认初始化
+m.at("c");// 访问关键字为“c”的元素，如果不存在返回out_of_range异常
+```
+
+#### `访问元素`
+
+```
+c.find(k);        返回一个迭代器，指向第一个关键字为k的元素，若不存在，返回尾后迭代器
+
+c.count(k);       返回关键字等于k的元素的数量
+
+c.lower_bound(k); 返回一个迭代器，指向第一个关键字不小于k的元素
+
+c.upper_bound(k); 返回一个迭代器，指向第一个关键字大于k的元素
+
+c.equal_range(k); 返回一个迭代器pair，表示关键字等于等于k的元素范围，如果不存在，两个成员都是c.end()
+
+```
+
+如果multimap或multiset中有多个元素具有给定关键字，那么这些元素在容器中会相邻存储
+
+```c++
+vector<pair<int,int>>v{{1,6},{2,1},{1,3},{4,3},{1,9}};
+multimap<int,int>m;
+m.insert(v.begin(),v.end());
+auto it=m.find(1);
+auto num=m.count(1);
+while(num)
+{
+    cout<< it->second <<' ';//6 3 9
+    ++it;
+    --num;
+}
+
+使用equal_range
+
+vector<pair<int,int>>v{{1,6},{2,1},{1,3},{4,3},{1,9}};
+multimap<int,int>m;
+m.insert(v.begin(),v.end());
+for(auto p=m.equal_range(1);p.first!=p.second;++p.first)
+{
+    cout<<p.first->second<<' ';// 6 3 9
+}
+```
+
+#### `一个单词转换的map`
+
+```c++
+map<string,string> buildmap(ifstream &map_file)
+{
+    map<string,string>m;
+    string key;
+    string value;
+    while(map_file>>key&&getline(map_file,value))// 先读入一个字符串，然后把这一行剩下的都读入
+    {
+        if(value.size()>1)// 检查是否有转换规则
+            m[key]=value.substr(1);// 跳过前导空格
+        else
+            throw runtime_error("no rule for"+key);// 引发一个错误
+    }
+    return m;
+}
+const string & transformm(const string &s,const map<string,string> &m)
+{
+    auto map_it=m.find(s);// 查找s是否存在于map中
+    if(map_it!=m.cend())
+        return map_it->second;// 存在，返回转换后结果
+    else
+        return s;// 不存在,返回原值
+}
+void word_transform(ifstream &map_file,ifstream &input,ofstream &output)
+{
+    auto m=buildmap(map_file);
+    string text;
+    while(getline(input,text))// 读入input的每一行
+    {
+        istringstream stream(text);//将这一行转化为string输入流
+        string word;
+        bool firstword = true;// 除了第一个单词以外之前都要加空格
+        while(stream>>word)// 读入这一行的每一个单词
+        {
+            if(firstword)
+                firstword=false;
+            else
+                output<<' ';
+            output<< transformm(word,m);
+        }
+        output<< endl;// 一行结束换行
+
+    }
+}
+int main()
+{
+   ifstream map_file("D:\\123.txt");
+   ifstream input("D:\\3.txt");
+   ofstream output("D:\\12.txt");
+   word_transform(map_file,input,output);
+}
+
+
+123.txt
+
+brb be right back
+k obky?
+y why
+r are
+u you
+pic picture
+thk thanks!
+18r later
+
+3.txt
+
+where r u
+y dont u send me a pic
+k thk 18r
+
+12.txt
+
+where are you
+why dont you send me a picture
+obky? thanks! later
+```
+
+<h3 id='2-11-4'>无序容器</h3>
+
+无序关联容器不是使用比较运算符来组织容器，而是通过使用一个`哈希函数`和`关键字类型的==运算符`
+
+无序容器在存储上组织为一组桶，每个桶·保存零个或多个元素。无序容器使用哈希函数将元素映射到桶中，为了访问一个元素，容器回先计算元素的哈希值，他将指出搜索哪个桶。所有有相同哈希值的所有元素都会保存在同一个桶中。
+
+无序容器性能依赖于哈希函数的质量和桶的数量和大小
+
+桶接口
+```c++
+unordered_map<int,int>m;
+m.insert({{1,2},{2,3},{5,6}});
+cout<< m.bucket_count() <<endl;// 正在使用的桶的数目 ， 11
+cout<< m.max_bucket_count() <<endl;// 容器能容纳的最多的桶的数目， 357913941
+cout<< m.bucket_size(1) <<endl; // 第1个桶中有多少个元素， 1
+cout<< m.bucket(5) <<endl;//关键字为5的元素在哪个桶中,  5
+```
+桶迭代
+```
+local_iterator              可以用来访问桶中元素的迭代器类型
+const_local_iterator    
+c.begin(n),    c.end(n)     桶n的首元素迭代器和尾后迭代器
+c.cbegin(n),    c.cend(n)
+```
+哈希策略
+```c++
+    unordered_map<int,int>m;
+    m.insert({{1,2},{2,3},{5,6}});
+    cout<< m.bucket_count() <<endl;// 正在使用的桶的数目 ， 11
+    cout<< m.load_factor() <<endl;// 返回每个桶的平均数量，0.272727
+    cout<< m.max_load_factor() <<endl;// 最大桶存储元素数量
+    m.rehash(20);  //重组存储，使使用桶数>=20，且桶数至少大于(size/max_load_factor)
+    cout<< m.bucket_count() <<endl;// 23
+    m.reserve(30); // 重组存储，使m可以保存20个元素，而不用rehash
+    cout<< m.bucket_count() <<endl;// 31
+```
+
+无序容器使用关键字类型的==来比较元素，他们还使用一个hash<key_type> 类型的对象来生成每个元素的哈希值
+
+我们可以直接定义关键字是内置类型的无序容器，但是不能直接定义关键字为自定义类类型的无序容器
+
+```c++
+struct node
+{
+    int a,b;
+};
+int hasher(const node &sd)
+{
+    return hash<int>()(sd.a);// 重载哈希函数
+}
+bool eqop(const node &k1,const node &k2)
+{
+    return k1.a==k2.a;// 重载==运算符
+}
+int main()
+{
+
+    using nodd = unordered_multiset<node,decltype(hasher)*,decltype(eqop)*>;
+
+    // 参数是桶大小，哈希函数指针，和相等性判断运算符指针
+    nodd aa(42,hasher,eqop);
+}
+```
+如果我们的类定义了==运算符，我们也可以只重载哈希函数
+
+<h2 id='2-12'>动态内存</h2>
+
+`静态内存`:保存static对象，类static数据成员,定义在任何函数之外的变量。(在使用之前分配，在程序结束时销毁)
+
+`栈内存`: 保存定义在函数内的非static对象，(仅在程序块运行时才存在)
+
+程序拥有`自由空间(堆)`，用来存储`动态内存`，动态内存生存期由程序控制，当动态对象不在使用时，我们必须显式的销毁他们
+
+<h3 id='2-12-1'>动态内存与智能指针</h3>
+
