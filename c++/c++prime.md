@@ -3434,3 +3434,51 @@ int main()
 
 <h3 id='2-12-1'>动态内存与智能指针</h3>
 
+头文件为`memory`
+
+动态内存的管理通过一对运算符：`new`，在动态内存中为对象分配空间并返回一个指向该对象的指针，`delete`,接收一个动态对象的指针，销毁该对象，并释放与之关联的内存
+
+为了更安全的使用动态内存，提供智能指针，可以自动释放所指向的对象。种类:1. `shared_ptr`，允许多个指针指向同一个对象，2.`unique_ptr`，独占所指向的对象,3.`week_ptr`,一种弱引用，指向shared_ptr所管理的对象
+
+shared_ptr和unique_ptr都有的操作
+```
+shared_ptr < T > sp     空智能指针，指向类型为T的对象
+unique_ptr < T > up
+p                       若p不为空，则为true
+*p                      解引用p，获得他指向的对象
+p->mem                  
+p.get()                 返回p中保存的指针
+swap(p,q)
+p.swap(q)
+```
+#### `shared_ptr`
+
+当指向一个对象的最后一个shared_ptr被销毁时，shared_ptr类会通过析构函数自动销毁此对象
+
+```c++
+int y=4;
+shared_ptr<int> p1=make_shared<int>();//为默认初始化
+shared_ptr<int> p2=make_shared<int>(42);
+shared_ptr<string> p3=make_shared<string>(10,'9');
+cout<<p1<<endl;//0x86104c
+cout<<p1.get()<<endl;//0x86104c
+cout<<*p3<<endl;// 9999999999
+
+// 指向42元素的计数器变为2，指向0元素的计数器变为0，这时，0元素被销毁，内存被释放
+p1=p2;
+    
+```
+当动态对象不在被使用时，shared_ptr类会自动释放动态对象，但是仅当被指向的内存没有其他引用时，指向的内存被销毁
+```c++
+shared_ptr<int> aa(int a)
+{
+    shared_ptr<int> p = make_shared<int>(a);
+    return p;// 当我们返回p时，引用技术进行递增操作
+}//所以当p离开作用域时，p指向的内存不会被释放
+```
+
+使用动态内存的原因：1. 程序不知道自己需要使用多少对象 2. 程序不知道所需对象的准确类型 3. 程序需要在多个对象间共享数据
+
+动态内存允许多个对象共享相同的状态。
+
+
