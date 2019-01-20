@@ -3481,4 +3481,152 @@ shared_ptr<int> aa(int a)
 
 动态内存允许多个对象共享相同的状态。
 
-。
+`exercise.h`
+```c++
+#include<memory>
+#include<vector>
+#include<string>
+#include <initializer_list>
+#include <exception>
+using namespace std;
+class StrBlob {
+public:
+    using size_type=vector<string>::size_type;// 别名
+    StrBlob();// 不接受参数的构造函数
+    StrBlob(initializer_list<string> il);//接收参数列表的构造函数
+    size_type size() const {return data->size();};// 返回大小
+    bool empty() const {return data->empty();};// 是否为空
+    void push_back(const string &t) {data->push_back(t);};// 添加元素
+    void pop_back();// 删除元素
+
+    string& front();// 访问首元素
+    string& back();// 访问尾元素
+private:
+    shared_ptr<vector<string>> data;
+    void check(size_type i,const string &msg) const;// 检查访问的元素是否超范围
+};
+StrBlob::StrBlob(): data(make_shared<vector<string>>()) {}
+StrBlob::StrBlob(initializer_list<string> il): data(make_shared<vector<string>>(il)) {}
+void StrBlob::check(size_type i,const string &msg) const
+{
+    if (i>=data->size())
+        throw out_of_range(msg);
+}
+string& StrBlob::front()
+{
+    // 如果vector为空，check返回一个异常
+    check(0,"front on empty StrBlob");
+    return data->front();
+}
+string& StrBlob::back()
+{
+    check(0,"back on empty StrBlob");
+    return data->back();
+}
+void StrBlob::pop_back()
+{
+    check(0,"pop_back on empty StrBlob");
+    data->pop_back();
+}
+```
+`main.cpp`
+```c++
+#include "exercise.h"
+#include<iostream>
+int main()
+{
+  StrBlob b1;
+  {
+      StrBlob b2 ={"a","an","the"};
+      b1=b2;
+      b2.push_back("about");
+  }
+  // 它们实际操作的是同一个vector，都包含4个元素。在代码的结尾，b2 被析构了，不影响 b1 的元素。
+}
+```
+
+#### `直接管理内存`
+
+默认情况下，动态分配是默认初始化的，即内置类型或组合类型的值时未定义的
+
+```c++
+int *pi1 = new int;     // 默认初始化,*pi1的值未定义
+int *pi2 = new int();   // 值初始化为0，*pi2的值为0
+
+auto p1 = new auto(obj);// 若poj为int，那么p1为int*
+```
+一般如果动态内存不足，new表达式就会失败，返回bad_alloc,我们也可以向new传递额外参数使得new不抛出异常而返回空指针
+```c++
+int *p1 = new int;// 分配失败，抛出 bad_alloc异常
+int *p2 = new (nothrow) int;// 分配失败,new返回空指针
+```
+
+delete表达式释放内存，但是传递给delete的指针必须是指向动态分配的指针，或者是空指针
+
+由内置指针(而不是智能指针)管理的动态内存在显式释放之前一直都会存在
+
+当我们释放一个指针后他就变为空悬指针，要记得将得指向nullptr，但是这样还是可能存在问题，例如：所以最好使用智能指针
+```c++
+int *p(new int(42));// p指向动态内存
+auto q = p; // q和p指向相同内存
+delete p; // p和q同时无效，所以我们得将p和q都绑定到空指针上
+```
+
+####  `shared_ptr和new结合使用`
+
+接受指针参数的智能指针构造函数是explicit的，因此我们要将内置函数转换为智能指针，必须使用直接初始化形式 
+```
+ shared_ptr<int> p2(new int(1024));
+```
+用来初始化智能指针的普通指针必须指向动态内存
+```
+shared_ptr<T> p(q)      p管理内置指针q所指向对象
+
+shared_ptr<T> p(q,d)    p管理内置指针q所指向对象且p使用可调用对象d(例如lambda)来代替delete
+
+shared_ptr<T> p(u)      p从unique_ptr u那边接管对象的所有权，u置为空
+
+shared_ptr<T> p(q2,d)   p是shared_ptr p2的拷贝,但是用d代替delete
+
+p.resert()              若p为唯一指向其对象的shared_ptr，resert会释放对象，将p置为空
+
+p.resert(q)             若p为唯一指向其对象的shared_ptr,释放对象,将p指向q
+
+p.resert(q,d)           若p为唯一指向其对象的shared_ptr,释放对象,将p指向q, 调用d而不是delete来释放q
+```
+
+不要混用普通指针和智能指针
+```c++
+void aa(shared_ptr<int> ptr)
+{
+
+}
+int main()
+{
+   int *x(new int(1024));// x为普通指针
+   // aa(x); 错误，不能将int *隐式转换为shared_ptr
+   aa(shared_ptr<int>(x));
+// 合法，但是有问题，因为临时shared_ptr对象的作用域在这个表达式结束后就结束了
+// shared_ptr被销毁那么x指向的内存被释放，以后我们就不能使用x了
+    int j = *x;// 错误，x是空悬指针
+}
+```
+shared_ptr的get操作用于将指针的访问权限传递给代码。不要用get初始化或赋值给另一个智能指针
+```c++
+shared_ptr<int> p(new int(42));
+int *q =p.get();// 现在q也指向p的对象
+{//新程序块
+    shared_ptr<int>(q);
+}// 程序块结束，q被销毁，指向的内存被释放
+int f = *p;// 未定义，因为p指向的内存已经被释放了
+```
+一般reset和unique一起使用，因为修改对象之前，要确认自己是否是唯一用户
+```c++
+shared_ptr<int> p(new int(42));
+p.reset(new int(1024));// p指向一个新对象，旧对象被释放
+
+if(!p.unique())
+    p.reset(new int(*p));// 不是唯一用户，分配新的拷贝
+```
+
+#### `智能指针和异常`
