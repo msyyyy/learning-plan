@@ -65,6 +65,8 @@
         - [无序容器](#2-11-4)
     - [动态内存](#2-12)
         - [动态内存与智能指针](#2-12-1)
+        - [动态数组](#2-12-2)
+        - [使用标准库：文本查询程序](#2-12-3)
 
 
 <h1 id='1'>C++基础</h1>
@@ -3630,3 +3632,186 @@ if(!p.unique())
 ```
 
 #### `智能指针和异常`
+
+在new之后对应的delete之前发送异常，且异常未被函数捕获，那么内存不会释放
+
+ 假设智能指针管理的资源不是new分配的的内存，记得传递一个删除器。当我们创建一个shared_ptr时，可以传递一个(可选的)指向删除器函数的参数，用我们传递的来代替delete,例如
+```c++
+struct node
+{
+    int a,b;
+    node(){a=4,b=5;}
+};
+void end_node(node *p) {p->a=1,p->b=2;}
+void f(node &c)
+{
+    shared_ptr<node> p(&c,end_node);
+}
+int main()
+{
+  node c;
+  cout<<c.a<<c.b<<endl;//45
+  f(c);
+  cout<<c.a<<c.b<<endl;//12
+}
+```
+#### `unique_ptr`
+
+初始化unique_ptr只有直接初始化， unique_ptr<int> p2(new int(42));
+
+```c++
+ unique_ptr<int> p2(new int(42));
+ //　p2放弃对指针的控制，返回指针，将p2置为空
+ unique_ptr <int> p1(p2.release());// p1所指对象为42
+ int a=7;
+ int *b = &a;
+ // 释放p1所指对象，提供指针b，p1指向b所指对象
+ p1.reset(b);// p1所指对象为7
+ 
+ //release一般用于初始化或赋值给另一个智能指针,不包括释放对象
+```
+
+提供删除器和shared_ptr有所不同
+```c++
+struct node
+{
+    int a,b;
+    node(){a=4,b=5;}
+};
+void end_node(node *p) {p->a=1,p->b=2;}
+void f(node &c)
+{
+    unique_ptr<node,decltype(end_node)*> p(&c,end_node);
+    // 需要提供删除器的类型，这里为函数指针类型，decltype返回函数类型，*表示为是该类型的指针
+}
+int main()
+{
+  node c;
+  cout<<c.a<<c.b<<endl;//45
+  f(c);
+  cout<<c.a<<c.b<<endl;//12
+}
+```
+
+#### `weak_ptr`
+
+weak_ptr是不受控制所指对象生存期的智能指针，指向由shared_ptr管理的对象，将weak_ptr绑定到一个shared_ptr时不会改变shared_ptr的引用计数,所以当最后的shared_ptr被销毁时，即使存在weak_ptr指向对象，对象还是会被释放
+
+```c++
+auto p=make_shared<int>(42);
+auto pp=p;
+weak_ptr<int> w(p);// 绑定shared_ptr
+w=pp;
+// use_count返回与w共享对象的shared_ptr数
+cout<< w.use_count() <<endl;// 2
+// expired，如果use_count为0,返回true，否则返回false
+cout<< w.expired() <<endl;// 0
+// 因为不确定所指对象是否存在，我们得调用lock，而不能直接访问
+// lock 如果他共享对象的shared_ptr数为0，返回空shared_ptr，
+// 否则返回指向共享对象的shared_ptr
+if(auto np=w.lock())
+{
+    cout<<*np;// 35
+}
+w.reset();// 将w置为空
+```
+
+weak_ptr可以检查类中的shared_ptr对象是否还存在，p421页
+
+<h3 id='2-12-2'>动态数组</h3>
+
+#### `new和数组`
+
+分配动态数组得到的是元素类型的指针，所以对于动态数组不能使用begin和end也不能用范围for
+
+```c++
+int *p = new int[10];// 10个未分配的int
+int *p1 = new int[10] ();// 10个默认初始值为0的int
+int *p2 = new int [10] {0,1,2};// 列表初始化，后几个为默认初始化
+// 如果初始化器数目小于元素数目，new表达式会失败，不会分配任何内存
+```
+动态分配一个空数组是合法的，差不多相当于尾后迭代器
+```
+char *cp = new char[0], 正确但是不能解引用
+```
+
+释放动态数组得加方括号    delete [] p; 元素逆序销毁，最后一个元素最先销毁
+
+`智能指针和动态数组`
+
+unique_ptr支持管理动态数组，shared_ptr不直接支持，想用得提供自己定义的删除器
+
+unique_ptr支持下标运算
+```c++
+// up指向一个包含10个未初始化int的数组
+unique_ptr<int[]> up(new int[10]);
+for(size_t i=0;i!=10;++i)
+    up[i]=i;// 通过下标运算符为每个元素赋予新值
+up.release();// 自动用delete[]销毁其指针
+```
+shared_ptr不支持下标运算符，也需要自己提供删除器
+```c++
+  shared_ptr<int>sp (new int[10],[](int *p){ delete [] p; } );
+  sp.reset();// 使用我们提供的lambda释放数组，即使用delete[]
+
+  // 不支持下标运算符
+  for (size_t i=0;i!=10;++i)
+    *(sp.get()+i) = i;// 使用get获取内置指针
+```
+
+#### `allocator类`
+
+定义于memory头文件中，可以让内存分配和对象构造分离开来
+
+```c++
+  // 定义名为a的allocator对象，他可以为类型为string型的对象分配内存
+  allocator<string> a;
+  // 分配一段原始的，未构造的内存，保存20个类型为string的对象
+  auto const p = a.allocate(20);
+  auto q = p;
+  // construct接收一个指针和零个或多个其他参数，其他参数用来初始化构造对象
+  a.construct(q,3,'c');
+  cout<<*q;// ccc
+  ++q;
+  a.construct(q); // *q为空字符串
+  ++q;
+  //还为构造就使用会报错
+
+  // 通过对每个构造的元素调用destroy来销毁，执行析构函数
+  while(q!=p)
+    a.destroy(--q);// 只能对真正构造的元素进行destroy
+
+  // 通过deallocate释放内存
+  a.deallocate(p,20);
+```
+
+```c++
+  vector<string> v{"a","b","c"};
+  // 定义名为a的allocator对象，他可以为类型为string型的对象分配内存
+  allocator<string> a;
+  // 分配一段原始的，未构造的内存，保存20个类型为string的对象
+  auto p = a.allocate(20);
+  auto q = p;
+  // uninitialized_copy返回一个指针，指向最后构造元素之后的位置
+  q = uninitialized_copy(v.begin(),v.end(),q); //a b c
+
+  q = uninitialized_copy_n(v.begin(),1,q);//a b c a
+
+  //  uninitialized_fill(b,e,t) 迭代器b和e指定范围内创建对象，对象值为t的拷贝
+
+  // 迭代器b指向的内存地址开始创建2个对象，对象值为do
+  uninitialized_fill_n(q,2,"do");// a b c a do do
+  q+=2;
+  while(q!=p)
+    cout<<*(p++)<<' ';
+
+  // 通过对每个构造的元素调用destroy来销毁，执行析构函数
+  while(q!=p)
+    a.destroy(--q);// 只能对真正构造的元素进行destroy
+
+  // 通过deallocate释放内存
+  a.deallocate(p,20);
+```
+
+<h3 id='2-12-3'>使用标准库：文本查询程序</h3>
+
