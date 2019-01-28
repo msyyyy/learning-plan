@@ -67,6 +67,9 @@
         - [动态内存与智能指针](#2-12-1)
         - [动态数组](#2-12-2)
         - [使用标准库：文本查询程序](#2-12-3)
+- [类设计者的工具](#3)
+    - [拷贝控制](#3-13)
+        - [拷贝,赋值与销毁](#3-13-1)
 
 
 <h1 id='1'>C++基础</h1>
@@ -3814,4 +3817,118 @@ shared_ptr不支持下标运算符，也需要自己提供删除器
 ```
 
 <h3 id='2-12-3'>使用标准库：文本查询程序</h3>
+
+```c++
+#include<bits/stdc++.h>
+using namespace std;
+using line_no =vector<string>::size_type;
+class QueryResult;
+class TextQuery {
+public:
+
+    TextQuery(ifstream&);
+    QueryResult query(const string&) const;
+private:
+    shared_ptr<vector<string>> file; // 输入文件
+    map<string,shared_ptr<set<line_no>>> wm;
+};
+// 读入输入文件并建立单词到行号的映射
+TextQuery::TextQuery(ifstream &is): file(new vector<string>)
+{
+    string text;
+    while(getline(is,text)) // 对文中每一行
+    {
+        file->push_back(text); // 保存此文本
+        int n = file->size()-1; // 当前行号
+        istringstream line(text); // 当行文本分解为单词
+        string word;
+        while(line>>word)
+        {
+            auto &lines=wm[word]; // lines是一个shared_ptr
+            if(!lines) // 第一次遇到这个单词时，此指针为空
+                lines.reset(new set<line_no>);// 分配新的set
+            lines->insert(n);// 将行号插入set中
+        }
+
+    }
+}
+class QueryResult {
+friend ostream& print (ostream&,const QueryResult&);
+public:
+    QueryResult(string s,shared_ptr<set<line_no>> p,shared_ptr<vector<string>> f): sought(s),lines(p),file(f) {}
+private:
+    string sought;// 查询单词
+    shared_ptr<set<line_no>> lines; // 出现的行号
+    shared_ptr<vector<string>> file; // 输入文件
+};
+QueryResult TextQuery::query(const string &sought) const
+{
+    // 如果未找到sought，返回指向此set的指针
+    static shared_ptr<set<line_no>> nodata(new set<line_no>);
+    // 使用find而不是下标运算符,避免将单词添加到wm中
+    auto loc = wm.find(sought);
+    if(loc==wm.end())
+        return QueryResult(sought,nodata,file);// 未找到
+    else
+        return QueryResult(sought,loc->second,file);
+}
+string make_plural(size_t ctr,const string &word,const string &ending)//是否超过1次，超过
+{
+    return (ctr>1) ? word+ending :word;
+}
+ostream &print(ostream & os,const QueryResult &qr)
+{
+    os<< qr.sought <<" occurs" << qr.lines->size() << " " <<make_plural(qr.lines->size(),"time","s") <<endl;
+
+    for(auto num : *qr.lines)
+        os << "\t(line" <<num+1 <<") "<< *(qr.file->begin()+num)<<endl;
+    return os;
+}
+void runQueries(ifstream &infile)
+{
+  TextQuery tq(infile);// 保存文件并建立查询,infile时我们要处理的文件
+
+  // 提示用户要输入的单词，完成查询输出结果
+  while(true)
+  {
+      cout<< "rnter word to look for ,or q to quit :";
+      // 提示输入或退出
+      string s;
+      if(!(cin >> s )||s=="q") break;
+      print(cout,tq.query(s)) <<endl;
+  }
+}
+
+int main()
+{
+  ifstream p("D:\\12.txt");
+  runQueries(p);
+
+}
+
+
+12.txt
+
+where are you
+why dont you send me a picture
+obky? thanks! later
+
+输入/输出
+
+rnter word to look for ,or q to quit :wh
+wh occurs0 time
+
+rnter word to look for ,or q to quit :you
+you occurs2 times
+        (line1) where are you
+        (line2) why dont you send me a picture
+
+rnter word to look for ,or q to quit :q
+```
+
+<h1 id='3'>类设计者的工具</h1>
+
+<h2 id='3-13'>拷贝控制</h2>
+
+<h3 id='3-13-1'>拷贝,赋值与销毁</h3>
 
