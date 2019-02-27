@@ -2,4 +2,4 @@
 
 [计算机网络课的错题集](./计算机网络课的错题集.md)
 
-[TCP-IP网络编程](./TCP-IP网络编程.md)
+[TCP-IP网络编程](https://github.com/msyyyy/TCP-IP-NetworkNote)
