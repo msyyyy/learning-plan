@@ -97,7 +97,7 @@ const pstring *ps;  // 指向常指针的 一个指针
 
 2. using base = double; 
  ```
- 
+
  #### auto 类型说明符
 
  what : 让编译器替我们分析表达式所属类型
