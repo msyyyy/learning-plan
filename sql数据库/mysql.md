@@ -492,7 +492,121 @@ group by 部门，工种;
 连接查询
 
 又称多表查询，当查询字段来自多个表时，会用到连接查询
+sql92标准，仅支持内连接
+sql99标准，全支持
 
+按功能分类
+	内连接：
+		等值连接
+		非等值连接	
+		自连接
+	外连接：
+		左外连接
+		右外连接
+		全外连接(sql99不支持)
+	交叉连接
+
+#1. 等值连接
+案例1 查询女神名和对应的男神名
+select name,boyname
+from boys,beauty
+where beauty.boyfriend_id =boy.id;
+
+可以为表起别名，提高语句简洁度，区分多个重名的字段
+如果为表起了别名，那么查询字段不能用原来的表名去限定
+
+案例2 查询每个城市的部门个数
+
+select count(*) 个数，city
+from d,l
+d.id=l.id
+group by city;
+
+案例3 查询每个工种的工种名和员工的个数，并且按员工个数降序
+
+select 工种名，count(*)
+from 工种,员工
+where 工种id = 员工的工种id
+group by 工种
+order by count(*) desc;
+
+#2.非等值连接
+
+案例1. 查询员工的工资和工资级别
+员工表  工资  
+工资级别表  等级   最低工资  最高工资
+
+select 工资，工资级别
+from 员工，级别表
+where 工资 between 级别表.最低工资 and  级别表.最高工资
+
+#3. 自连接
+
+案例  查询 员工名和上级的名称
+
+员工表 编号  名字 上级编号
+
+select a.名字，b.名字
+from 员工表 a ,from 员工表 b
+where a.上级编号 = b.编号
+```
+
+```
+sql99语法
+select 查询列表
+from 表1 别名 【连接类型】
+join 表2 别名 
+on 连接条件
+【where 筛选条件】
+【group by 分组】
+【having 筛选条件】
+【order by 排序列表】
+
+分类
+内连接 inner，可以省略
+外连接
+	左外 left  【outer】
+	右外 right 【outer】
+	全外 full  【outher】
+交叉连接 cross
+
+
+内连接
+select 查询列表
+from 表1 别名
+inner join 表2 别名
+on 连接条件
+
+#1. 等值连接
+
+案例1 查询名字包含e的员工名和工种名
+select 员工名,工种名
+from 员工 a
+inner join 工种 b
+on a.工种 = b.工种
+where a.名字 like '%e%';
+
+案例2 查询部门个数> 3 的城市名和部门个数
+select 城市名,count(*)
+from 城市 a
+inner join 部门 b
+on a.城市 = b.城市
+group by 城市
+having count(*) >3;
+
+#2. 非等值连接
+
+#3. 自连接
+
+```
+
+```
+外连接
+分主从表，主表中有，从表没有，用null填充主表，主表信息都会显示
+/*
+
+应用场景：用于查询一个表有，另一个表没有的记录
+*/
 ```
 
 
