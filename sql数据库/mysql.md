@@ -604,9 +604,326 @@ having count(*) >3;
 外连接
 分主从表，主表中有，从表没有，用null填充主表，主表信息都会显示
 /*
-
 应用场景：用于查询一个表有，另一个表没有的记录
+外连接的查询结果为主表中的所有记录
+	如果从中有和他匹配的，则显示匹配的值
+	如果没有匹配的，显示null
+	外连接查询结果=内连接结果 + 主表中有而从表没有的记录
+2。 左外连接 left 左边的是主表 
+	右外连接 right 右边的是主表
 */
+、
+案例1 查询男朋友不在男神表的女神名
+select a.女神名
+from 女神 a
+left join 男神 b
+on a.男朋友编号 = b.编号
+where b.编号 is null;
+
+3. 全外
+
+表1和表2的并集
+
+4. 交叉连接
+
+笛卡尔乘积
+
+
+1. a与b的交集
+内连接
+2.表a的所有数据
+a当主表左外
+3.表b所以数据
+b当主表 右外
+4. a中数据不包括交集部分
+a当主表 where b is null
+5. 全部
+全外连接
+6. 只不包括交集部分
+全外 where a is null or b is null
+
+
+案例 1 查询编号>3的女神的男朋友信息 ，如果有则列出详细，如果没有，用null填充
+select b.*
+from 女神表 a
+left join 男神表 b
+on a.男朋友编号 = b.编号
+where b.标号>3;
+
+案例2 查询那个城市没有部门、
+select a.name
+from 城市 a
+left join 部门 b
+on a.name = b.城市
+where b.主键列 is null;
+
+```
+
+```
+子查询
+
+出现在其他语句中的select语句 ，称为子查询或内查询
+
+分类：
+按子查询出现的位置:
+	select后面：
+			仅仅支持标量子查询
+	from后面
+			支持表子查询
+	where或having后面	❤
+			标量子查询  (单行)√
+			列子查询    (多行)√
+			
+			行子查询用的较少
+	exists后面(相关子查询)
+			表子查询
+按结果集的行列数不同
+	标量子查询(结果集只有一行一列)
+	列子查询(结果集只有一列多行)
+	行子查询(结果集有一行多列)
+	表子查询(结果集一般为多行多列)
+	
+	
+一，where或having后面
+
+1. 标量子查询(单行子查询)
+
+2.列子查询(多行子查询)
+
+3.行子查询(多列多行)
+特点：
+① 子查询放在小括号内
+② 子查询一般放在条件的右侧
+③ 标量子查询，一般搭配这单行操作符使用
+> < >= <= = <>
+
+列子查询，一般搭配这多行操作符使用
+IN         等于列表中的任意一个
+ANY/SOME   和子查询返回的某一个值比较
+ALL		   和子查询返回的所有值比较
+
+子查询的执行优先于主查询指向，主查询的条件用到了子查询的结果
+
+#1 标量子查询
+
+案例1 ，谁的工资比 abel 高
+
+select a.name
+from 工资表 a
+where a.工资>(
+select 工资
+from 工资表 b
+where b.姓名 = abel;
+);
+
+案例2 返回工种 与141 员工相同，工资比143号员工多的员工信息
+
+select a.*
+from 员工表 a
+where a.工种=( 
+select 工种
+from 员工表 b
+where b.编号 = 141;
+)
+and a.工资 >
+(select 工资
+from 员工表 c
+where c.编号 =143);
+
+案例3 返回公司工资最少的员工的姓名，工种 和 工资
+select a.姓名, a.工种, a.工资
+from 员工表 a
+where a.工资 = (
+select min(工资)
+from 员工表
+)
+
+案例 4 查询最低工资大于50号部门最低工资的部门id和最低工资
+
+select 部门id ，min(工资)
+from 员工表
+group by 部门id
+having min(工资) > (
+	select min(工资)
+	from 员工表
+	where 编号 = 50;
+);
+
+
+#2. 列子查询
+案例1 返回城市是14 或 17 的部门中所有员工的姓名
+select a.姓名
+from 员工表 a
+where a.部门编号 in (
+	select b.部门编号
+	from 部门表 b
+	where b.城市 in(14,17);
+);
+
+案例2 返回其他部门中 比工种为‘IT’部门任一工资低的员工的员工信息
+
+select max(工资)
+from 员工表
+where 工种 = ‘IT’
+
+
+select *
+from 员工表
+where 工种 <> 'IT'
+and 工资 < (
+	select max(工资)
+	from 员工表
+	where 工种 = ‘IT’
+)
+
+#3 行子查询
+
+案例1查询员工编号最小且他还是工资最高的员工是否存在
+
+select *
+from 员工表
+where (编号 , 工资) =(
+	select min(编号) ,max(工资)
+	from 员工表
+);
+
+二 放select 后面 
+
+# 案例 1 查询每个部门的员工个数
+
+select  a.* , (
+	select count(*)
+	from 员工表 b
+	where b.id = a.id
+) 个数
+from 部门表 a;
+
+# 案例 2 查询员工号=102的部门名
+select 部门名
+from 部门表 a
+join 员工表 b
+on a.部门id = b.部门id
+where b.员工号 =102;
+
+
+三 放在from后面
+
+案例 查询每个部门的平均工资的工资等级
+
+select avg(工资),部门名
+from 员工表
+group by 部门名
+
+select a.* ,g.等级
+from (
+	select avg(工资) c,部门名
+    from 员工表
+    group by 部门名
+) a
+join 工资等级表 b
+on a.c between 最小值 and 最大值
+
+四 放在exists后面 (相关子查询)
+
+exists(完整查询语句)
+结果
+1或0
+
+案例1  查询和aa相同部门的员工姓名和工资
+
+select 部门
+from 员工表
+where 姓名='aa';
+
+select 姓名，工资
+from 员工表
+where 部门 = （
+	select 部门
+    from 员工表
+    where 姓名='aa'
+）;
+
+案例2 查询各部门中工资比本部门平均工资高的员工的员工号，姓名和工资
+1. 查询各部门的平均工资
+select avg(工资) ,部门编号
+from 员工
+group by 部门编号
+
+2. 连接1结果集和员工表
+select 员工号 ，姓名， 工资
+from 员工表 a
+join (
+    select avg(工资) ag,部门编号
+    from 员工
+    group by 部门编号
+) b
+on a.部门号 = b.部门号
+where a.工资 > ag; 
+
+
+案例 3  查询和姓名中包含字母u的员工在相同部门的员工的员工号和姓名
+1。查询包含u员工的部门
+select distinct 部门
+from 员工表
+where 姓名 like '%u%'
+
+2. 
+select 员工号， 姓名
+from 员工表 
+where 部门 in (
+    select distance 部门
+    from 员工表
+    where 姓名 like '%u%'
+);
+
+案例4 查询管理者是king的员工姓名和工资
+
+1. 
+select 编号
+from 员工表 
+where 姓名 = king
+
+select 姓名,工资
+from 员工表
+where 领导编号 = （
+    select 编号
+    from 员工表 
+    where 姓名 = king
+）；
+
+或
+
+select a.姓名，a.工资
+from 员工表 a
+join 员工表 b
+on a.领导编号 = b.编号
+where b.姓名 =king;
+
+```
+
+```
+分页查询 limit 
+
+limit  起始索引 ，size
+
+起始索引从0开始
+
+select 查询列表					7
+from 表1 别名 					1
+【连接类型 join 表2 别名】		2
+【on 连接条件】				  3
+【where 筛选条件】			  4
+【group by 分组】			    5
+【having 筛选条件】			  6
+【order by 排序列表】			   8
+limit 起始索引，长度				9
+
+
+查询前5条员工信息
+
+select *
+from 员工表
+limit 0,5;
 ```
 
 
