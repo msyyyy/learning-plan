@@ -926,5 +926,52 @@ from 员工表
 limit 0,5;
 ```
 
+```
+案例 1  查询所以学员 邮箱的用户名 ，(邮箱@之前的字段)
+
+select substr(email,1,instr(email,‘@’)-1) 用户名
+from 表
+
+案例 2 查询工资最低的员工信息
+# 1.查询最低工资
+select min(工资)
+from 表
+# 2。
+select *
+from 表
+where 工资 =（
+	select min(工资)
+    from 表
+）;
+
+
+案例3 查询平均工资最低的部门信息和该部门的平均工资
+
+#1. 平均工资
+select avg(工资) 
+from 员工表
+group by 部门
+
+#2. 获得最低工资和部门信息
+select min(ag)
+from (
+    select avg(工资) ag
+    from 员工表
+    group by 部门
+);
+#3. 获得部门信息
+select 
+
+案例4 查询平均工资最高的job信息
+
+案例5 查询平均工资高于公司平均工资的部门有哪些
+
+案例6 查询公司中所有manager的详细信息
+
+案例7 各个部门中，最高工资中最低的那个部门的，最低工资是多少
+
+案例 8 查询平均工资最高的部门的manager的详细信息
+```
+
 
 
