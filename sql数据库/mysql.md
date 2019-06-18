@@ -952,25 +952,287 @@ select avg(工资)
 from 员工表
 group by 部门
 
-#2. 获得最低工资和部门信息
-select min(ag)
+#2. 获得最低工资和部门编号
+select avg(工资) ag,部门编号
+from 员工表
+group by 部门
+order by ag
+limit 1,1;
+
+#3. 获得部门信息和平均工资
+select a.ag,b.*
 from (
-    select avg(工资) ag
+	select avg(工资) ag,部门编号
     from 员工表
     group by 部门
-);
-#3. 获得部门信息
-select 
-
-案例4 查询平均工资最高的job信息
+    order by ag
+    limit 1,1
+) a
+join 部门表 b
+on a.编号= b.编号；
 
 案例5 查询平均工资高于公司平均工资的部门有哪些
+#1.公司平均成绩
+select avg(工资)
+from 员工表
 
-案例6 查询公司中所有manager的详细信息
+#2. 平均工资
+select 部门编号
+from 员工表
+group by 部门编号
+where avg(工资) > (
+    select avg(工资)
+    from 员工表
+)
 
-案例7 各个部门中，最高工资中最低的那个部门的，最低工资是多少
+```
 
-案例 8 查询平均工资最高的部门的manager的详细信息
+```
+联合查询
+
+union 将多条查询语句的结果合并成一个结果
+
+查询语句1
+union
+查询语句2
+
+应用场景：
+		  要查询结果来自多个表，且多个表没有直接的连接关系，但查询信息一致时
+案例 查询中国男性信息，以及外国男性信息
+特点： 1.要求多条查询语句的查询列数一致
+	  2. 多条查询语句的每一列的类型和顺序一致
+	  3. union 默认去重 ,使用 union all 可以包含重复项
+
+select *
+from 中国表
+where 性别=男
+
+union
+
+select *
+from 外国表
+where sex=男
+
+
+```
+
+```
+dml语言
+
+/*
+数据操作语言
+插入 insert
+修改 update
+删除 delete
+*/
+
+一 插入语句
+
+/*
+
+方法1语法：
+
+insert into 表名(列名,....)
+         values(值1,.....);
+
+特点:  1. 插入的值的类似要与列的类型一致或兼容
+	  2. 不可以为null的列必须插入值，可以为null的列如何插入值
+	  3. 列的顺序可以调换，列数和值数要相同
+	  
+	  
+方法2语法 :
+insert into 表名
+set 列名=值，列名=值,.....
+
+
+
+*/
+
+二 修改语句
+/*
+1. 修改单表的记录❤
+语法
+update 表名                      1
+set 列=新值，列=新值,...			3
+where 筛选条件;					  2
+
+
+2. 修改多表的记录
+92语法:
+
+update 表1 别名 ,表 2 别名
+set 列 =值，...
+where 连接条件
+and 筛选条件;
+
+99语法
+update 表1  别名
+【】 jion 表2 别名
+on 连接条件
+set 列 =值 ...
+where 筛选条件
+*/
+
+案例 1 修改女神表中姓唐的女神电话为1111
+update 女神表 
+set 电话 =‘1111’
+where 姓名 like '%唐%';
+
+
+案例2 修改张无忌的女朋友的手机号为 114
+
+update 男神表 b
+join 女神表 a
+on b.编号 = a.男朋友编号
+set a. 手机号 ='114'
+where b.姓名 ='张无忌';
+
+案例3 修改没有男朋友的女神的男朋友编号都为2号
+
+update 女神表 a
+left join 男神表 b
+on a.男朋友编号 = b.编号
+set a.男朋友编号 =2
+where a.男朋友编号 is null;
+
+三 删除语句
+
+/*
+方法一 delete
+语法:
+
+1. 单表删除❤
+delete from 表名 where 筛选条件
+
+2. 多表删除
+
+delete 表1的别名，表2的别名 (删除那个表就加那个表别名)
+from 表1 别名
+【】 join 表 2 别名
+on 连接条件
+where 筛选条件
+
+
+方法二   truncate  清空
+语法 
+
+truncate table 表名;
+*/
+
+案例： 删除张无忌的女朋友的信息
+
+delete a
+from 女神表 a
+join 男神表 b
+on a.男朋友编号 = b.编号
+where b.姓名 ='张无忌';
+```
+
+```
+ddl 数据定义语言
+
+/*
+库和表的管理
+
+一 库的管理
+创建 ，修改 删除
+
+二 表的管理
+创建，修改，删除
+
+创建 create
+修改 alter
+删除 drop
+*/
+
+一 库的管理
+#1. 库的创建
+create database if not exists books;
+// 如果没存在books库，创建books库
+
+#2.库的修改
+
+更改库的字符集
+alter datebase books character set (字符集);
+
+alter datebase books character set gbk;
+#3. 库的删除
+drop database if exists books;
+
+
+
+
+二 表的管理
+#1. 表的创建 ❤
+
+create table 表名(
+		列名 列的类型  【（长度） 约束】,
+		列名 列的类型  【（长度） 约束】,
+		列名 列的类型  【（长度） 约束】,
+		列名 列的类型  【（长度） 约束】
+)
+
+案例 创建表 book 
+
+create table book(
+		id int,			     #编号
+		bname varchar(20),   #图书名
+		price double,        #价格
+		authorid  int,       #作者编号
+		publishDate datetime #出版日期
+);
+
+#2. 表的修改
+/*
+	alter table 表名 add|drop|modify|change column 列名 【列类型  约束】;
+*/
+
+1. 修改列名
+alter table book change column publishDate pubDate datetime;
+// 将publishDate  改为  pubDate
+
+2. 修改列的类型或约束
+alter table book modify column puDate timestamp;
+// 将pubDate的datetime类型变为timestamp类型
+
+3. 添加新列
+alter table author add column annual double;
+// 添加author表新一列 annual 类型为double;
+
+4. 删除列
+alter table author drop column annual;
+//删除author表的 annual列；
+
+5. 修改表名；
+alter table author rename to book_author;
+//修改表名author 为 book_author
+
+#3. 表的删除
+drop table if exists book;
+
+
+通用写法:
+
+drop database if exists 旧库名;
+create database 新库名;
+
+drop table if exists 旧表名;
+create table 新表();
+
+#4. 表的复制
+
+1、仅仅复制表的结构 ，没有数据
+create table a like b;
+// a复制为b的结构
+
+2. 复制表的结构+数据
+create table a
+select * from b;
+// a复制b的数据和结构
+
+3. 复制部分数据
+where 筛选
+
 ```
 
 
