@@ -1235,5 +1235,228 @@ where 筛选
 
 ```
 
+```
+常见数据类型
+数值型
+		整数
+		小数
+			定点数
+			浮点数
+字符型
+		较短的文本 char varchar
+		较长的文本 text blob(较长的二进制数据)
+日期型
+
+1. 设置有无符号 
+int 
+int unsigned 设置无符号
+2. 插入数据超出整型返回，回报 out of range 异常，并且插入临界值
+
+3. int(7)  zerofill  代表显示结果的长度    zerofill用0填充
+
+小数
+/*
+
+1. 浮点型
+	float(M,D)
+	double(M,D)
+
+2. 定点型 (更精确)
+dec(M,D)
+//decimal(M,D)
+dec 默认是dec(10,0)
+
+D代表小数点后位数  ，M为整数部位和小数部位的位数之和
+超过范围插入临界值
+
+*/
+
+字符型
+较短的文本
+char(M)    
+carchar(M)
+M代表最长的字符数
+
+binary 和varbinary 保存较短二进制
+
+char    固定长度字符     空间比较耗费   效率比较高
+varchar 可变长度字符	   节省空间      效率略低
+
+enum 枚举类型
+set 集合， set可以选择多个，enum只能选取一个
+
+日期型
+date 
+datetime   格式时间，不受时区影响
+timestamp  时间戳，受时区影响
+time
+year
+
+```
+
+```
+常见约束
+/*
+一种限制，为了保证表中数据的准确和可靠性
+分类 六大约束
+	not null: 分空
+	比如 姓名，学号
+	default：默认，保证该字段有默认值
+	primary key ：主键，保证该字段的值具有唯一性，且非空
+	比如学号，编号
+	unique: 唯一，用于保证该字段的值具有唯一性 ，可以为空
+	比如座位号
+	check ：检查约束 【mysql 中不支持】
+	比如 年龄，性别
+	foreign key ：外键 ，用于限制两个表的关系，用于保证该字段的值必须来自于主表的关联列的值
+*/
+添加约束时机
+	1.创建表时
+	2.修改表时
+	
+约束的添加分类
+	1.列级约束
+			六大约束语法都支持，外键约束没效果
+	2.表级约束：
+			除了非空，默认，其他都支持
+	/*
+		语法:在各个字段的最下面
+		【constraint 约束名】 约束类型(字段名)
+	*/
+	
+create table 表名(
+	字段名 字段类型 列级约束,
+	字段名 字段类型 列级约束
+	constraint 表级约束
+)
+
+# 通用的写法
+
+create table if exists test(
+	id int Primary key,
+	stuname varchar(20) not null,
+	sex char(1),
+	seat int unique,
+	constraint fk_stuinfo_major foreign key(majorid) references major(id)
+	
+)
+
+主键和唯一的对比
+			唯一性	是否允许为空非空 一个表中有多少个	是否允许组合(多个列组合成一个建)
+主键			√		x			至多1个			允许，但不推荐 primary key()
+唯一键			√		√			任意个				允许，但不推荐
+
+外键 
+	1.要求在从表设置外键关系
+	2.从表的外键列的类型和主表的关联列的类型要求一致或兼容，名称无要求
+	3.主表的关联列必须是一个key(一般是主键或唯一)
+	4.插入数据时，先插入主表，再插入从表
+	5.删除数据时，先删除从表 在删除主表
+
+修改表时的添加约束
+create table a(
+	b carchar(20)
+)
+1.添加非空约束
+alter table a modlfy column b varchar(20) not null;
+
+
+案例1 向表emp2的id列中添加primary key 约束 (my_emp_id_pk)
+
+#1, 方法一 ，列级约束，不能起别名
+alter table emp2 modify colunm id int primary key;
+#2.方法二 表级约束,可以起别名
+alter table emp2 add constrain my_emp_id_pk primary key(id);
+
+案例2 向表emp2中添加dept_id，并在其中定义foreign key 约束,与之相关联的是data2表中的id列
+alter table emp2 add column dept_id int;
+alter table emp2 add constrain fk_emp2_dept2 foreign key(dept_id)  refernces dept2(id);
+
+
+```
+
+```
+标识列
+/*
+又称自增长列 auto_increment,插入时插入null即可
+含有 可以不用手动的插入值，系统提供默认的序列值
+
+
+特点 1.标识列必须是一个key
+	2. 标识列只能有一个
+	3.标识列的类型只能是数值型
+	4.标识列可以通过设置 set auto_increment_increment = ? ;设置步长
+	5.标识列可以通过直接插入数值，修改起始值
+*/
+#create table a(
+	id int primary key auto_increament,
+	name varchar(20)
+);
+insert into a(id,name) values(null,'john');
+insert into a(name) values('lucyt');
+```
+
+```
+事物 ACID
+原子性
+一致性
+隔离性
+持续性
+
+set autocommit=0; 开启显示事物
+start transaction ; 【可选】
+编写sql语句
+#结束事物
+commit; 提交事物
+rollback; 回滚事物
+```
+
+```
+视图
+虚拟表，临时性，是在使用视图时动态生成的，只保存了sql查询逻辑，不保存查询结果
+
+创建视图
+create view v1
+as
+select 语句
+
+案例1 查询姓名中包含a字符的员工名，部门名和工种信息
+#1 创建视图
+create view myv1
+as
+select 员工名，部门名，工种信息
+from 员工表 a
+join 部门表 b on a.部门id =b.部门id
+join 工种表 c on a.工种id = c.工种id
+#2 使用视图
+select *
+from myv1
+where 姓名 like '%a%';
+
+案例2 查询各部门的平均工资级别
+
+create view myv2
+as
+select avg(工资) ag ，编号
+from 员工表
+group by 部门;
+
+select myv2.ag ,g.工资等级
+from myv2
+join 工资等级表 g
+on myv2.ag between g.最低工资 and g.最高工资;
+
+视图修改
+
+/*
+
+方法一
+create or replace view 视图名
+as 
+查询语句
+
+*/
+```
+
 
 
