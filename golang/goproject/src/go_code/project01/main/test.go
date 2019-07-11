@@ -1,3 +1,6 @@
+/*
+ text 
+*/
 package main
 
 import (

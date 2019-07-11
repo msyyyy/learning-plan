@@ -1144,3 +1144,720 @@ Go 语言最终选择将 c 的 Data 结构分配在堆上。然后由垃圾回�
 - 变量是否被取地址。
 - 变量是否发生逃逸。
 
+## 2.12 Go语言变量的生命周期
+
+变量的生命周期指的是在程序运行期间变量有效存在的时间间隔。对于在包一级声明的变量来说，它们的生命周期和整个程序的运行周期是一致的。而相比之下，局部变量的声明周期则是动态的：每次从创建一个新变量的声明语句开始，直到该变量不再被引用为止，然后变量的存储空间可能被回收。函数的参数变量和返回值变量都是局部变量。它们在函数每次被调用的时候创建。
+
+
+
+  那么 [Go语言](http://c.biancheng.net/golang/)的自动垃圾收集器是如何知道一个变量是何时可以被回收的呢？这里我们可以避开完整的技术细节，基本的实现思路是，从每个包级的变量和每个当前运行函数的每一个局部变量开始，通过指针或引用的访问路径遍历，是否可以找到该变量。如果不存在这样的访问路径，那么说明该变量是不可达的，也就是说它是否存在并不会影响程序后续的计算结果。
+
+因为一个变量的有效周期只取决于是否可达，因此一个循环迭代内部的局部变量的生命周期可能超出其局部作用域。同时，局部变量可能在函数返回之后依然存在。
+
+编译器会自动选择在栈上还是在堆上分配局部变量的存储空间，但可能令人惊讶的是，这个选择并不是由用 var 还是 new 声明变量的方式决定的。  
+
+```go
+var global *int
+ 
+func f() {  
+    var x int // x在堆上，从f函数中逃逸
+    x = 1
+    global = &x
+}
+
+func g() { 
+    y := new(int)
+    *y = 1
+}
+```
+
+  f 函数里的 x 变量必须在堆上分配，因为它在函数退出后依然可以通过包一级的 global 变量找到，虽然它是在函数内部定义的；用 Go语言的术语说，这个 x 局部变量从函数 f 中逃逸了。
+
+相反，当 g 函数返回时，变量 *y 将是不可达的，也就是说可以马上被回收的。因此，*y 并没有从函数 g 中逃逸，编译器可以选择在栈上分配 *y 的存储空间（译注：也可以选择在堆上分配，然后由 Go语言的 GC 回收这个变量的内存空间），虽然这里用的是 new 方式。  
+
+## 2.13 Go语言常量和const关键字
+
+[Go语言](http://c.biancheng.net/golang/)中的常量使用关键字 const 定义，用于存储不会改变的数据。常量是在编译时被创建，即使被定义为函数局部的也如此，并且只能是布尔型、数字型（整数型、浮点型和复数）和字符串型。由于编译时的限制，定义常量的表达式必须为能被编译器求值的常量表达式。
+
+在 Go 语言中，你可以省略类型说明符 [type]，因为编译器可以根据变量的值来推断其类型。
+
+- 显式类型定义： const b string = "abc"
+- 隐式类型定义： const b = "abc"
+
+常量的值必须是能够在编译时就能够确定的；可以在其赋值表达式中涉及计算过程，但是所有用于计算的值必须在编译期间就能获得。
+
+- 正确的做法：const c1 = 2/3
+- 错误的做法：const c2 = getNumber() // 引发构建错误: getNumber() 用做值
+
+和变量声明一样，可以批量声明多个常量；这比较适合声明一组相关的常量：
+
+```go
+const (
+    e  = 2.7182818
+    pi = 3.1415926
+)
+```
+
+如果是批量声明的常量，除了第一个外其它的常量右边的初始化表达式都可以省略，如果省略初始化表达式则表示使用前面常量的初始化表达式写法，对应的常量类型也一样的。例如：
+
+```go
+const (
+    a = 1
+    b
+    c = 2
+    d
+)
+
+fmt.Println(a, b, c, d) // "1 1 2 2"
+```
+
+**iota 常量生成器**
+
+常量声明可以使用 iota 常量生成器初始化，它用于生成一组以相似规则初始化的常量，但是不用每行都写一遍初始化表达式。在一个 const 声明语句中，在第一个声明的常量所在的行，iota 将会被置为 0，然后在每一个有常量声明的行加一。
+
+【示例 1】首先定义一个 Weekday 命名类型，然后为一周的每天定义了一个常量，从周日 0 开始。在其它编程语言中，这种类型一般被称为枚举类型。
+
+```go
+type Weekday int
+
+const (
+    Sunday Weekday = iota
+    Monday
+    Tuesday
+    Wednesday
+    Thursday
+    Friday
+    Saturday
+)
+```
+
+iota 不仅只生成每次增加 1 的枚举值。我们还可以利用 iota 来做一些强大的枚举常量值生成器。下面的代码可以方便生成标志位常量：
+
+```go
+const (
+    FlagNone = 1 << iota
+    FlagRed
+    FlagGreen
+    FlagBlue
+)
+
+fmt.Printf("%d %d %d\n", FlagRed, FlagGreen, FlagBlue)
+fmt.Printf("%b %b %b\n", FlagRed, FlagGreen, FlagBlue)
+
+代码说明如下：
+第 2 行中 iota 使用了一个移位操作，每次将上一次的值左移一位，以做出每一位的常量值。
+第 8 行，将 3 个枚举按照常量输出，分别输出 2、4、8，都是将 1 每次左移一位的结果。
+第 9 行，将枚举值按二进制格式输出，可以清晰地看到每一位的变化。
+```
+
+```
+2 4 8
+10 100 1000
+```
+
+将枚举值转换为字符串
+
+```go
+package main
+
+import "fmt"
+
+// 声明芯片类型
+type ChipType int
+
+const (
+    None ChipType = iota
+    CPU    // 中央处理器
+    GPU    // 图形处理器
+)
+
+func (c ChipType) String() string {
+    switch c {
+    case None:
+        return "None"
+    case CPU:
+        return "CPU"
+    case GPU:
+        return "GPU"
+    }
+
+    return "N/A"
+}
+
+func main() {
+
+    // 输出CPU的值并以整型格式显示
+    fmt.Printf("%s %d", CPU, CPU)
+}
+
+/*
+代码说明如下：
+第 6 行，将 int 声明为 ChipType 芯片类型。
+第 9 行，将 const 里定义的一句常量值设为 ChipType 类型，且从 0 开始，每行值加 1。
+第 14 行，定义 ChipType 类型的方法 String()，返回字符串。
+第 15～22 行，使用 switch 语句判断当前的 ChitType 类型的值，返回对应的字符串。
+第 30 行，输出 CPU 的值并按整型格式输出。
+*/
+```
+
+```
+CPU 1
+```
+
+使用 String() 方法的 ChipType 在使用上和普通的常量没有区别。当这个类型需要显示为字符串时，Go 语言会自动寻找 String() 方法并进行调用。
+
+
+
+**无类型常量**
+
+许多常量并没有一个明确的基础类型，编译器为这些没有明确的基础类型的数字常量提供比基础类型更高精度的算术运算；
+
+通过延迟明确常量的具体类型，无类型的常量不仅可以提供更高的运算精度，而且可以直接用于更多的表达式而不需要显式的类型转换。
+
+对于常量面值，不同的写法可能会对应不同的类型。例如 0、0.0、0i 和 \u0000 虽然有着相同的常量值，但是它们分别对应无类型的整数、无类型的浮点数、无类型的复数和无类型的字符等不同的常量类型。同样，true 和 false 也是无类型的布尔类型，字符串面值常量是无类型的字符串类型。
+
+## 2.14 Go语言type关键字（类型别名）
+
+在 Go 1.9 版本之前的内建类型定义的代码是这样写的：
+
+```
+type byte uint8
+type rune int32
+```
+
+而在 Go 1.9 版本之后变为：
+
+```
+type byte = uint8
+type rune = int32
+```
+
+这个修改就是配合类型别名而进行的修改。
+
+类型别名的写法为：
+
+`type TypeAlias = Type`
+
+类型定义的写法
+
+`type TypeAlias  Type`
+
+类型别名与类型定义表面上看只有一个等号的差异，那么它们之间实际的区别有哪些呢？下面通过一段代码来理解。
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+// 将NewInt定义为int类型
+type NewInt int
+
+// 将int取一个别名叫IntAlias
+type IntAlias = int
+
+func main() {
+
+    // 将a声明为NewInt类型
+    var a NewInt
+    // 查看a的类型名
+    fmt.Printf("a type: %T\n", a)
+
+    // 将a2声明为IntAlias类型
+    var a2 IntAlias
+    // 查看a2的类型名
+    fmt.Printf("a2 type: %T\n", a2)
+}
+
+/*
+代码说明如下：
+第 8 行，将 NewInt 定义为 int 类型，这是常见定义类型的方法，通过 type 关键字的定义，NewInt 会形成一种新的类型。NewInt 本身依然具备int的特性。
+第 11 行，将 IntAlias 设置为 int 的一个别名，使用 IntAlias 与 int 等效。
+第 16 行，将 a 声明为 NewInt 类型，此时若打印，则 a 的值为 0。
+第 18 行，使用%T格式化参数，显示 a 变量本身的类型。
+第 21 行，将 a2 声明为 IntAlias 类型，此时打印 a2 的值为 0。
+第 23 行，显示 a2 变量的类型。
+*/
+```
+
+```
+a type: main.NewInt
+a2 type: int
+```
+
+tAlias 类型只会在代码中存在，编译完成时，不会有 IntAlias 类型。
+
+**非本地类型不能定义方法**
+
+```go
+package main
+
+import (
+    "time"
+)
+
+// 定义time.Duration的别名为MyDuration
+type MyDuration = time.Duration
+
+// 为MyDuration添加一个函数
+func (m MyDuration) EasySet(a string) {
+
+}
+
+func main() {
+
+}
+/*
+代码说明如下：
+第 8 行，使用类型别名为 time.Duration 设定一个别名叫 MyDuration。
+第 11 行，为这个别名添加一个方法。
+*/
+```
+
+编译上面代码报错，信息如下：
+
+`cannot define new methods on non-local type time.Duration`
+
+编译器提示：不能在一个非本地的类型 time.Duration 上定义新方法。非本地方法指的就是使用 time.Duration 的代码所在的包，也就是 main 包。因为 time.Duration 是在 time 包中定义的，在 main 包中使用。time.Duration 包与 main 包不在同一个包中，因此不能为不在一个包中的类型定义方法。
+
+解决这个问题有下面两种方法：
+
+- 将第 8 行修改为 type MyDuration time.Duration，也就是将 MyDuration 从别名改为类型。
+- 将 MyDuration 的别名定义放在 time 包中。
+
+# 3 Go语言容器（container）
+
+## 3.1 Go语言数组详解
+
+`var a [3]int   // 定义三个整数的数组`
+
+数组的每个元素都可以通过索引下标来访问，索引下标的范围是从 0 开始到数组长度减 1 的位置。内置的 len 函数将返回数组中元素的个数。
+
+```go
+var a [3]int             // 定义三个整数的数组
+fmt.Println(a[0])        // 打印第一个元素
+fmt.Println(a[len(a)-1]) // 打印最后一个元素
+
+// 打印索引和元素
+for i, v := range a {
+    fmt.Printf("%d %d\n", i, v)
+}
+
+// 仅打印元素
+for _, v := range a {
+    fmt.Printf("%d\n", v)
+}
+```
+
+默认情况下，数组的每个元素都被初始化为元素类型对应的零值，对于数字类型来说就是 0。同时也可以使用数组字面值语法用一组值来初始化数组：
+
+```go
+var q [3]int = [3]int{1, 2, 3}
+var r [3]int = [3]int{1, 2}
+fmt.Println(r[2]) // "0"
+```
+
+在数组字面值中，如果在数组的长度位置出现的是“...”省略号，则表示数组的长度是根据初始化值的个数来计算。因此，上面 q 数组的定义可以简化为：
+
+```go
+q := [...]int{1, 2, 3}
+fmt.Printf("%T\n", q) // "[3]int"
+```
+
+在这种形式的数组字面值形式中，初始化索引的顺序是无关紧要的，而且没用到的索引可以省略，和前面提到的规则一样，未指定初始值的元素将用零值初始化。例如，
+
+```go
+r := [...]int{99: -1}
+
+定义了一个含有 100 个元素的数组 r，最后一个元素被初始化为 -1，其它元素都是用 0 初始化。
+```
+
+## 3.2 Go语言多维数组简述
+
+```go
+// 声明一个二维整型数组，两个维度分别存储 4 个元素和 2 个元素
+var array [4][2]int
+// 使用数组字面量来声明并初始化一个二维整型数组
+array := [4][2]int{{10, 11}, {20, 21}, {30, 31}, {40, 41}}
+// 声明并初始化外层数组中索引为 1 个和 3 的元素
+array := [4][2]int{1: {20, 21}, 3: {40, 41}}
+// 声明并初始化外层数组和内层数组的单个元素
+array := [4][2]int{1: {0: 20}, 3: {1: 41}}
+```
+
+## 3.3 Go语言切片详解
+
+切片（slice）是对数组一个连续片段的引用（该数组我们称之为相关数组，通常是匿名的），所以切片是一个引用类型.这个片段可以是整个数组，或者是由起始和终止索引标识的一些项的子集。需要注意的是，终止索引标识的项不包括在切片内。
+
+在 [Go语言](http://c.biancheng.net/golang/)中 Slice 代表变长的序列，序列中每个元素都有相同的类型。一个 slice 类型一般写作 []T，其中 T 代表 slice 中元素的类型；slice 的语法和数组很像，只是没有固定长度而已。
+
+Go语言切片的内部结构包含地址、大小和容量。切片一般用于快速地操作一块数据集合。如果将数据集合比作切糕的话，切片就是你要的“那一块”。切的过程包含从哪里开始（这个就是切片的地址）及切多大（这个就是切片的大小）。容量可以理解为装切片的口袋大小，如下图所示。
+
+![img](http://c.biancheng.net/uploads/allimg/180813/1-1PQ3154340Y9.jpg)
+
+`slice [开始位置:结束位置]`
+
+- slice 表示目标切片对象。
+- 开始位置对应目标切片对象的索引。
+- 结束位置对应目标切片的结束索引,   终止索引标识的项不包括在切片内。。
+
+```go
+var a  = [3]int{1, 2, 3}
+fmt.Println(a, a[1:2])
+```
+
+```
+[1 2 3]  [2]
+```
+
+从数组或切片生成新的切片拥有如下特性：
+
+- 取出的元素数量为：结束位置-开始位置。
+- 取出元素不包含结束位置对应的索引，切片最后一个元素使用 slice[len(slice)] 获取。
+- 当缺省开始位置时，表示从连续区域开头到结束位置。
+- 当缺省结束位置时，表示从开始位置到整个连续区域末尾。
+- 两者同时缺省时，与切片本身等效。
+- 两者同时为0时，等效于空切片，一般用于切片复位。
+
+**直接声明新的切片**
+
+除了可以从原有的数组或者切片中生成切片，你也可以声明一个新的切片。每一种类型都可以拥有其切片类型，表示多个类型元素的连续集合。因此切片类型也可以被声明。切片类型声明格式如下：
+
+`var name []T`
+
+- name 表示切片类型的变量名。
+- T 表示切片类型对应的元素类型。
+
+```go
+// 声明字符串切片
+var strList []string
+
+// 声明整型切片
+var numList []int
+
+// 声明一个空切片
+var numListEmpty = []int{}
+//numListEmpty 已经被分配到了内存，但没有元素，因此和 nil 比较时是 false。
+
+
+// 输出3个切片
+fmt.Println(strList, numList, numListEmpty)
+
+// 输出3个切片大小
+fmt.Println(len(strList), len(numList), len(numListEmpty))
+
+// 切片判定空的结果
+fmt.Println(strList == nil)
+fmt.Println(numList == nil)
+fmt.Println(numListEmpty == nil)
+```
+
+```
+[] [] []
+0 0 0
+true
+true
+false
+```
+
+**使用 make() 函数构造切片**
+
+如果需要动态地创建一个切片，可以使用 make() 内建函数，格式如下：
+
+`make( []T, size, cap )`
+
+- T：切片的元素类型。
+- size：就是为这个类型分配多少个元素。
+- cap：预分配的元素数量，这个值设定后不影响 size，只是能提前分配空间，降低多次分配空间造成的性能问题。
+
+```go
+a := make([]int, 2)
+b := make([]int, 2, 10)
+
+fmt.Println(a, b)
+fmt.Println(len(a), len(b))
+```
+
+```
+[0 0] [0 0]
+2 2
+```
+
+  a 和 b 均是预分配 2 个元素的切片，只是 b 的内部存储空间已经分配了 10 个，但实际使用了 2 个元素。
+
+容量不会影响当前的元素个数，因此 a 和 b 取 len 都是 2。  
+
+**使用 make() 函数生成的切片一定发生了内存分配操作**。但给定开始与结束位置（包括切片复位）的切片只是将新的切片结构指向已经分配好的内存区域，设定开始与结束位置，不会发生内存分配操作。
+
+切片不一定必须经过 make() 函数才能使用。生成切片、声明后使用 append() 函数均可以正常使用切片。  
+
+Go语言的内建函数 append() 可以为切片动态添加元素，代码如下所示：
+
+```go
+var a []int
+a = append(a, 1) // 追加1个元素
+a = append(a, 1, 2, 3) // 追加多个元素, 手写解包方式
+a = append(a, []int{1,2,3}...) // 追加一个切片, 切片需要解包
+```
+
+不过要注意的是，在容量不足的情况下， append 的操作会导致重新分配内存（扩容），可能导致巨大的内存分配和复制数据代价。即使容量足够，依然需要用 append 函数的返回值来更新切片本身，因为新切片的长度已经发生了变化。
+
+在开头一般都会导致内存的重新分配，而且会导致已有的元素全部复制 1 次。因此，从切片的开头添加元素的性能一般要比从尾部追加元素的性能差很多。
+
+## 3.5 Go语言copy()：切片复制（切片拷贝）
+
+```go
+slice1 := []int{1, 2, 3, 4, 5}
+slice2 := []int{5, 4, 3}
+copy(slice2, slice1) // 只会复制slice1的前3个元素到slice2中
+copy(slice1, slice2) // 只会复制slice2的3个元素到slice1的前3个位置
+```
+
+copy 函数将返回成功复制的元素的个数，等于两个 slice 中较小的长度，所以我们不用担心覆盖会超出目标 slice 的范围。
+
+## 3.6 Go语言从切片中删除元素
+
+Go语言并没有对删除切片元素提供专用的语法或者接口，需要使用切片本身的特性来删除元素。根据要删除元素的位置有三种情况：从开头位置删除，从中间位置删除，从尾部删除。其中删除切片尾部的元素最快：
+
+```go
+a = []int{1, 2, 3}
+a = a[:len(a)-1] // 删除尾部1个元素
+a = a[:len(a)-N] // 删除尾部N个元素
+```
+
+删除开头的元素可以直接移动数据指针：
+
+```go
+a = []int{1, 2, 3}
+a = a[1:] // 删除开头1个元素
+a = a[N:] // 删除开头N个元素
+```
+
+删除开头的元素也可以不移动数据指针，但是将后面的数据向开头移动。可以用 append 原地完成（所谓原地完成是指在原有的切片数据对应的内存区间内完成，不会导致内存空间结构的变化）：
+
+```go
+a = []int{1, 2, 3}
+a = append(a[:0], a[1:]...) // 删除开头1个元素
+a = append(a[:0], a[N:]...) // 删除开头N个元素
+```
+
+对于删除中间的元素，需要对剩余的元素进行一次整体挪动，同样可以用 append 或 copy 原地完成：
+
+```go
+a = []int{1, 2, 3, ...}
+a = append(a[:i], a[i+1:]...) // 删除中间1个元素
+a = append(a[:i], a[i+N:]...) // 删除中间N个元素
+a = a[:i+copy(a[i:], a[i+1:])] // 删除中间1个元素
+a = a[:i+copy(a[i:], a[i+N:])] // 删除中间N个元素
+```
+
+## 3.7 Go语言range关键字：循环迭代切片
+
+既然切片是一个集合，那么就可以迭代其中的元素。[Go语言](http://c.biancheng.net/golang/)有个特殊的关键字 range，它可以配合关键字 for 来迭代切片里的元素，如下所示：
+
+```go
+// 创建一个整型切片
+// 其长度和容量都是 4 个元素
+slice := []int{10, 20, 30, 40}
+// 迭代每一个元素，并显示其值
+for index, value := range slice {
+    fmt.Printf("Index: %d Value: %d\n", index, value)
+}
+```
+
+```
+Index: 0 Value: 10
+Index: 1 Value: 20
+Index: 2 Value: 30
+Index: 3 Value: 40
+```
+
+当迭代切片时，关键字 range 会返回两个值。第一个值是当前迭代到的索引位置，第二个值是该位置对应元素值的一份副本，如下图所示。
+
+【示例 1】range 提供了每个元素的副本
+
+```go
+// 创建一个整型切片
+// 其长度和容量都是4 个元素
+slice := []int{10, 20, 30, 40}
+// 迭代每个元素，并显示值和地址
+for index, value := range slice {
+    fmt.Printf("Value: %d Value-Addr: %X ElemAddr: %X\n",
+    value, &value, &slice[index])
+}
+```
+
+```
+Value: 10 Value-Addr: 10500168 ElemAddr: 1052E100
+Value: 20 Value-Addr: 10500168 ElemAddr: 1052E104
+Value: 30 Value-Addr: 10500168 ElemAddr: 1052E108
+Value: 40 Value-Addr: 10500168 ElemAddr: 1052E10C
+```
+
+## 2.8 Go语言多维切片简述
+
+![整型切片的切片的值](http://c.biancheng.net/uploads/allimg/190614/4-1Z61416004D92.gif)
+
+【示例】组合切片的切片
+
+```go
+// 创建一个整型切片的切片
+slice := [][]int{{10}, {100, 200}}
+// 为第一个切片追加值为 20 的元素
+slice[0] = append(slice[0], 20)
+```
+
+Go语言里使用 append 函数处理追加的方式很简明：先增长切片，再将新的整型切片赋值给外层切片的第一个元素。当上面代码中的操作完成后，会为新的整型切片分配新的底层数组，然后将切片复制到外层切片的索引为 0 的元素，如下图所示。
+
+![append 操作之后外层切片索引为 0 的元素的布局](http://c.biancheng.net/uploads/allimg/190614/4-1Z614160234963.gif)
+
+## 2.9 Go语言map（Go语言映射）
+
+Go语言中 map 是一种特殊的数据结构：一种元素对（pair）的无序集合，pair 的一个元素是 key，对应的另一个元素是 value，所以这个结构也称为关联数组或字典。这是一种快速寻找值的理想结构：给定 key，对应的 value 可以迅速定位。
+
+map 这种数据结构在其他编程语言中也称为字典（Python）、hash 和 HashTable 等。
+
+map 是引用类型，可以使用如下声明：
+
+```
+var map1 map[keytype]valuetype
+
+var map1 map[string]int
+```
+
+其中：
+
+- keytype 为键类型。
+- valuetype 是键对应的值类型。
+
+> 提示：[keytype] 和 valuetype 之间允许有空格，但是 gofmt（格式化代码工具）会移除空格。
+
+在声明的时候不需要知道 map 的长度，map 是可以动态增长的。未初始化的 map 的值是 nil。
+
+key 可以是任意可以用 == 或者 != 操作符比较的类型，比如 string、int、float。所以数组、切片和结构体不能作为 key，但是指针和接口类型可以。如果要用结构体作为 key 可以提供 Key() 和 Hash() 方法，这样可以通过结构体的域计算出唯一的数字或者字符串的 key。
+
+value 可以是任意类型的；通过使用空接口类型，我们可以存储任意值，但是使用这种类型作为值时需要先做一次类型断言。
+
+map 传递给函数的代价很小：在 32 位机器上占 4 个字节，64 位机器上占 8 个字节，无论实际上存储了多少数据。通过 key 在 map 中寻找值是很快的，比线性查找快得多，但是仍然比从数组和切片的索引中直接读取要慢 100 倍；所以如果很在乎性能的话还是建议用切片来解决问题。
+
+  map 也可以用函数作为自己的值，这样就可以用来做分支结构：key 用来选择要执行的函数。
+
+如果 key1 是 map1 的 key，那么 map1[key1] 就是对应 key1 的值，就如同数组索引符号一样（数组可以视为一种简单形式的 map，key 是从 0 开始的整数）。
+
+key1 对应的值可以通过赋值符号来设置为`val1：map1[key1] = val1`。
+
+令`v: = map1[key1]`可以将 key1 对应的值赋值为 v；如果 map 中没有 key1 存在，那么 v 将被赋值为 map1 的值类型的空值。
+
+常用的 len(map1) 方法可以获得 map 中的 pair 数目，这个数目是可以伸缩的，因为 map-pairs 在运行时可以动态添加和删除。  
+
+```go
+package main
+import "fmt"
+
+func main() {
+    var mapLit map[string]int
+    //var mapCreated map[string]float32
+    var mapAssigned map[string]int
+    mapLit = map[string]int{"one": 1, "two": 2}
+    mapCreated := make(map[string]float32)
+    mapAssigned = mapLit// map是引用类型，这句话相当于给mapLit起别名
+    mapCreated["key1"] = 4.5
+    mapCreated["key2"] = 3.14159
+    mapAssigned["two"] = 3 // maplit的值也修改了
+    fmt.Printf("Map literal at \"one\" is: %d\n", mapLit["one"])
+    fmt.Printf("Map created at \"key2\" is: %f\n", mapCreated["key2"])
+    fmt.Printf("Map assigned at \"two\" is: %d\n", mapLit["two"])
+    fmt.Printf("Map literal at \"ten\" is: %d\n", mapLit["ten"])
+}
+```
+
+```\
+Map literal at "one" is: 1
+Map created at "key2" is: 3.14159
+Map assigned at "two" is: 3
+Mpa literal at "ten" is: 0
+```
+
+map 是引用类型的： 内存用 make 方法来分配。
+
+map 的初始化：`var map1[keytype]valuetype = make(map[keytype]valuetype)`，简写为：`map1 := make(map[keytype]valuetype)` 。
+
+  不要使用 new，永远用 make 来构造 map
+
+注意：如果错误的使用 new() 分配了一个引用对象，你会获得一个空引用的指针，相当于声明了一个未初始化的变量并且取了它的地址
+
+**map 容量**
+
+和数组不同，map 可以根据新增的 key-value 对动态的伸缩，因此它不存在固定长度或者最大限制。但是也可以选择标明 map 的初始容量 capacity，格式如下：
+
+`make(map[keytype]valuetype, cap) `。
+
+例如：
+
+`map2 := make(map[string]float, 100)`
+
+当 map 增长到容量上限的时候，如果再增加新的 key-value 对，map 的大小会自动加 1。所以出于性能的考虑，对于大的 map 或者会快速扩张的 map，即使只是大概知道容量，也最好先标明。
+
+**用切片作为 map 的值**
+
+  既然一个 key 只能对应一个 value，而 value 又是一个原始类型，那么如果一个 key 要对应多个值怎么办？例如，当我们要处理 unix 机器上的所有进程，以父进程（pid 为整形）作为 key，所有的子进程（以所有子进程的 pid 组成的切片）作为 value。通过将 value 定义为 []int 类型或者其他类型的切片，就可以优雅的解决这个问题。
+
+这里有一些定义这种 map 的例子：  
+
+```go
+mp1 := make(map[int][]int)
+mp2 := make(map[int]*[]int)
+```
+
+**Go语言遍历map（访问map中的每一个键值对）**
+
+```go
+scene := make(map[string]int)
+
+scene["route"] = 66
+scene["brazil"] = 4
+scene["china"] = 960
+
+for k, v := range scene {
+    fmt.Println(k, v)
+}
+```
+
+只遍历键时，使用下面的形式：
+
+```
+for k := range scene {
+```
+
+如果需要特定顺序的遍历结果，正确的做法是排序，代码如下：\
+
+```go
+scene := make(map[string]int)
+
+// 准备map数据
+scene["route"] = 66
+scene["brazil"] = 4
+scene["china"] = 960
+
+// 声明一个切片保存map数据
+var sceneList []string
+
+// 将map数据遍历复制到切片中
+for k := range scene {
+    sceneList = append(sceneList, k)
+}
+
+// 对切片进行排序
+sort.Strings(sceneList)
+
+// 输出
+fmt.Println(sceneList)
+```
+
+```
+[brazil china route]
+```
+
+## 2.10 Go语言map元素的删除和清空
+
