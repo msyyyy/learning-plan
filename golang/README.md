@@ -1861,3 +1861,350 @@ fmt.Println(sceneList)
 
 ## 2.10 Go语言map元素的删除和清空
 
+**使用 delete() 函数从 map 中删除键值对**
+
+使用 delete() 内建函数从 map 中删除一组键值对，delete() 函数的格式如下：`delete(map, 键)`
+
+- map 为要删除的 map 实例。
+- 键为要删除的 map 键值对中的键。
+
+**清空 map 中的所有元素**
+
+有意思的是，Go 语言中并没有为 map 提供任何清空所有元素的函数、方法。清空 map 的唯一办法就是重新 make 一个新的 map。不用担心垃圾回收的效率，Go 语言中的并行垃圾回收效率比写一个清空函数高效多了
+
+## 2.11 Go语言sync.Map（在并发环境中使用的map）
+
+Go 语言中的 map 在并发情况下，只读是线程安全的，同时读写线程不安全。
+
+Go 语言在 1.9 版本中提供了一种效率较高的并发安全的 sync.Map。sync.Map 和 map 不同，不是以语言原生形态提供，而是在 sync 包下的特殊结构。
+
+sync.Map有以下特性：
+
+- 无须初始化，直接声明即可。
+- sync.Map 不能使用 map 的方式进行取值和设置等操作，而是使用 sync.Map 的方法进行调用。Store 表示存储，Load 表示获取，Delete 表示删除。
+- 使用 Range 配合一个回调函数进行遍历操作，通过回调函数返回内部遍历出来的值。Range 参数中的回调函数的返回值功能是：需要继续迭代遍历时，返回 true；终止迭代遍历时，返回 false。
+
+并发安全的 sync.Map 演示代码如下
+
+```go
+package main
+
+import (
+      "fmt"
+      "sync"
+)
+
+func main() {
+
+    var scene sync.Map
+
+    // 将键值对保存到sync.Map
+    scene.Store("greece", 97)
+    scene.Store("london", 100)
+    scene.Store("egypt", 200)
+
+    // 从sync.Map中根据键取值
+    fmt.Println(scene.Load("london"))
+
+    // 根据键删除对应的键值对
+    scene.Delete("london")
+
+    // 遍历所有sync.Map中的键值对
+    scene.Range(func(k, v interface{}) bool {
+
+        fmt.Println("iterate:", k, v)
+        return true
+    })
+
+}
+/*
+代码说明如下：
+第 10 行，声明 scene，类型为 sync.Map。注意，sync.Map 不能使用 make 创建。
+第 13～15 行，将一系列键值对保存到 sync.Map 中，sync.Map 将键和值以 interface{} 类型进行保存。
+第 18 行，提供一个 sync.Map 的键给 scene.Load() 方法后将查询到键对应的值返回。
+第 21 行，sync.Map 的 Delete 可以使用指定的键将对应的键值对删除。
+第 24 行，Range() 方法可以遍历 sync.Map，遍历需要提供一个匿名函数，参数为 k、v，类型为 interface{}，每次 Range() 在遍历一个元素时，都会调用这个匿名函数把结果返回。
+*/
+```
+
+```
+100 true
+iterate: egypt 200
+iterate: greece 97
+```
+
+sync.Map 没有提供获取 map 数量的方法，替代方法是获取时遍历自行计算数量。sync.Map 为了保证并发安全有一些性能损失，因此在非并发情况下，使用 map 相比使用 sync.Map 会有更好的性能。
+
+## 2.12 Go语言list（列表）
+
+列表是一种非连续存储的容器，由多个节点组成，节点通过一些变量记录彼此之间的关系。列表有多种实现方法，如单链表、双链表等。
+
+在 Go 语言中，将列表使用 container/list 包来实现，内部的实现原理是双链表。列表能够高效地进行任意位置的元素插入和删除操作。
+
+**初始化列表**
+
+list 的初始化有两种方法：New 和声明。两种方法的初始化效果都是一致的。
+
+1) 通过 container/list 包的 New 方法初始化 list
+
+`变量名 := list.New()`
+
+2) 通过声明初始化list
+
+`var 变量名 list.List`
+
+列表与切片和 map 不同的是，列表并没有具体元素类型的限制。因此，列表的元素可以是任意类型。这既带来遍历，也会引来一些问题。给一个列表放入了非期望类型的值，在取出值后，将 interface{} 转换为期望类型时将会发生宕机。
+
+**在列表中插入元素**
+
+双链表支持从队列前方或后方插入元素，分别对应的方法是 PushFront 和 PushBack。
+
+#### 提示
+
+这两个方法都会返回一个 `*list.Element` 结构。如果在以后的使用中需要删除插入的元素，则只能通过 *list.Element 配合 Remove() 方法进行删除，这种方法可以让删除更加效率化，也是双链表特性之一。
+
+```go
+l := list.New()
+
+l.PushBack("fist")
+l.PushFront(67)
+
+/*
+第 1 行，创建一个列表实例。
+第 3 行，将 fist 字符串插入到列表的尾部，此时列表是空的，插入后只有一个元素。
+第 4 行，将数值 67 放入列表。此时，列表中已经存在 fist 元素，67 这个元素将被放在 fist 的前面。
+*/
+```
+
+列表插入元素的方法如下表所示。
+
+| 方  法                                                | 功  能                                            |
+| ----------------------------------------------------- | ------------------------------------------------- |
+| InsertAfter(v interface {}, mark * Element) * Element | 在 mark 点之后插入元素，mark 点由其他插入函数提供 |
+| InsertBefore(v interface {}, mark * Element) *Element | 在 mark 点之前插入元素，mark 点由其他插入函数提供 |
+| PushBackList(other *List)                             | 添加 other 列表元素到尾部                         |
+| PushFrontList(other *List)                            | 添加 other 列表元素到头部                         |
+
+**从列表中删除元素**
+
+列表的插入函数的返回值会提供一个 *list.Element 结构，这个结构记录着列表元素的值及和其他节点之间的关系等信息。从列表中删除元素时，需要用到这个结构进行快速删除。
+
+列表操作元素：
+
+````go
+package main
+
+import "container/list"
+
+func main() {
+    l := list.New()
+
+    // 尾部添加
+    l.PushBack("canon")
+
+    // 头部添加
+    l.PushFront(67)
+
+    // 尾部添加后保存元素句柄
+    element := l.PushBack("fist")
+
+    // 在fist之后添加high
+    l.InsertAfter("high", element)
+
+    // 在fist之前添加noon
+    l.InsertBefore("noon", element)
+
+    // 使用
+    l.Remove(element)
+}
+/*
+第 6 行，创建列表实例。
+第 9 行，将 canon 字符串插入到列表的尾部。
+第 12 行，将 67 数值添加到列表的头部。
+第 15 行，将 fist 字符串插入到列表的尾部，并将这个元素的内部结构保存到 element 变量中。
+第 18 行，使用 element 变量，在 element 的位置后面插入 high 字符串。
+第 21 行，使用 element 变量，在 element 的位置前面插入 noon 字符串。
+第 24 行，移除 element 变量对应的元素。
+*/
+````
+
+下表中展示了每次操作后列表的实际元素情况。
+
+| 操作内容                        | 列表元素                    |
+| ------------------------------- | --------------------------- |
+| l.PushBack("canon")             | canon                       |
+| l.PushFront(67)                 | 67, canon                   |
+| element := l.PushBack("fist")   | 67, canon, fist             |
+| l.InsertAfter("high", element)  | 67, canon, fist, high       |
+| l.InsertBefore("noon", element) | 67, canon, noon, fist, high |
+| l.Remove(element)               | 67, canon, noon, high       |
+
+**遍历列表——访问列表的每一个元素**
+
+遍历双链表需要配合 Front() 函数获取头元素，遍历时只要元素不为空就可以继续进行。每一次遍历调用元素的 Next，如代码中第 9 行所示。
+
+```go
+l := list.New()
+
+// 尾部添加
+l.PushBack("canon")
+
+// 头部添加
+l.PushFront(67)
+
+for i := l.Front(); i != nil; i = i.Next() {
+    fmt.Println(i.Value)
+}
+/*
+第 1 行，创建一个列表实例。
+第 4 行，将 canon 放入列表尾部。
+第 7 行，在队列头部放入 67。
+第 9 行，使用 for 语句进行遍历，其中 i:=l.Front() 表示初始赋值，只会在一开始执行一次；每次循环会进行一次 i!=nil 语句判断，如果返回 false，表示退出循环，反之则会执行 i=i.Next()。
+第 10 行，使用遍历返回的 *list.Element 的 Value 成员取得放入列表时的原值。
+*/
+```
+
+```
+67
+canon
+```
+
+# 3 流程控制
+
+  Go 语言的常用流程控制有 if 和 for，而 switch 和 goto 主要是为了简化代码、降低重复代码而生的结构，属于扩展类的流程控制。
+
+本章主要介绍了 Go 语言中的基本流程控制语句，包括分支语句（if 和 switch）、循环（for）和跳转（goto）语句。另外，还有循环控制语句（break 和 continue），前者的功能是中断循环或者跳出 switch 判断，后者的功能是继续 for 的下一个循环。  
+
+## 3.1 Go语言分支结构
+
+关键字 if 和 else 之后的左大括号 { 必须和关键字在同一行，如果你使用了 else-if 结构，则前段代码块的右大括号 } 必须和 else-if 关键字在同一行。这两条规则都是被编译器强制规定的。
+
+```go
+if condition1 {
+    // do something
+} else if condition2 {
+    // do something else
+}else {
+    // catch-all or default
+}
+```
+
+if 还有一种特殊的写法，可以在 if 表达式之前添加一个执行语句，再根据变量值进行判断，代码如下：
+
+```go
+if err := Connect(); err != nil {
+    fmt.Println(err)
+    return
+}
+```
+
+  Connect 是一个带有返回值的函数，err:=Connect() 是一个语句，执行 Connect 后，将错误保存到 err 变量中。
+
+err！=nil 才是 if 的判断表达式，当 err 不为空时，打印错误并返回。
+
+这种写法可以将返回值与判断放在一行进行处理，而且返回值的作用范围被限制在 if、else 语句组合中。  
+
+#### 提示
+
+在编程中，变量在其实现了变量的功能后，作用范围越小，所造成的问题可能性越小，每一个变量代表一个状态，有状态的地方，状态就会被修改，函数的局部变量只会影响一个函数的执行，但全局变量可能会影响所有代码的执行状态，因此限制变量的作用范围对代码的稳定性有很大的帮助。
+
+## 3.2 Go语言for（循环结构）
+
+与多数语言不同的是，Go语言中的循环语句只支持 for 关键字，而不支持 while 和 do-while 结构。关键字 for 的基本使用方法与 C语言和 C++ 中非常接近：
+
+```go
+sum := 0
+for i := 0; i < 10; i++ {
+    sum += i
+}
+```
+
+Go语言还进一步考虑到无限循环的场景
+
+```go
+sum := 0
+for {
+    sum++
+    if sum > 100 {
+        break
+    }
+}
+```
+
+使用循环语句时，需要注意的有以下几点：
+
+- 左花括号`{`必须与 for 处于同一行。
+- Go语言中的 for 循环与 C语言一样，都允许在循环条件中定义和初始化变量，唯一的区别是，Go语言不支持以逗号为间隔的多个赋值语句，必须使用平行赋值的方式来初始化多个变量。
+- Go语言的 for 循环同样支持 continue 和 break 来控制循环，但是它提供了一个更高级的 break，可以选择中断哪一个循环，如下例：
+
+```go
+for j := 0; j < 5; j++ {
+    for i := 0; i < 10; i++ {
+        if i > 5 {
+            break JLoop
+        }
+        fmt.Println(i)
+    }
+}
+JLoop:
+// ...
+```
+
+上述代码中，break 语句终止的是 JLoop 标签处的外层循环。
+
+
+
+
+
+  初始语句是在第一次循环前执行的语句，一般使用初始语句执行变量初始化，如果变量在此处被声明，其作用域将被局限在这个 for 的范畴内。
+
+初始语句可以被忽略，但是初始语句之后的分号必须要写，代码如下：  
+
+```go
+step := 2
+for ; step > 0; step-- {
+    fmt.Println(step)
+}
+```
+
+这段代码将 step 放在 for 的前面进行初始化，for 中没有初始语句，此时 step 的作用域就比在初始语句中声明 step 要大。
+
+**for 中的条件表达式——控制是否循环的开关**
+
+几个函数是一样的
+
+```go
+var i int
+
+for ; ; i++ {
+
+    if i > 10 {
+        break
+    }
+}
+
+```
+
+```go
+var i int
+
+for {
+
+    if i > 10 {
+        break
+    }
+
+    i++
+}
+```
+
+```go
+var i int
+
+for i <= 10 {
+    i++
+}
+
+上面这段代码其实类似于其他编程语言中的 while，在 while 后添加一个条件表达式，满足条件表达式时持续循环，否则结束循环。
+```
+
